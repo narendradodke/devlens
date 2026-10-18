@@ -6,16 +6,16 @@ import { ToolShellPage } from '../pages/ToolShellPage';
 describe('ToolShellPage component', () => {
   it('renders tool shell with planned specs for a valid tool', () => {
     render(
-      <MemoryRouter initialEntries={['/jwt-inspector']}>
-        <ToolShellPage toolId="jwt-inspector" />
+      <MemoryRouter initialEntries={['/regex-playground']}>
+        <ToolShellPage toolId="regex-playground" />
       </MemoryRouter>
     );
 
-    expect(screen.getByText('JWT Inspector')).toBeInTheDocument();
+    expect(screen.getByText('Regex Playground')).toBeInTheDocument();
     expect(screen.getByText(/Planned Tool — Implementation Scheduled for/i)).toBeInTheDocument();
     expect(screen.getByText(/Planned Technical Capabilities/i)).toBeInTheDocument();
     expect(
-      screen.getByText(/Strict Base64URL decoding with UTF-8 byte reconstruction/i)
+      screen.getByText(/Isolated Web Worker execution with timeout protection/i)
     ).toBeInTheDocument();
   });
 

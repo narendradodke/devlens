@@ -26,8 +26,8 @@ export const TOOLS = [
     shortName: 'JWT',
     path: '/jwt-inspector',
     category: 'Security & Auth',
-    status: 'planned',
-    statusLabel: 'Planned (Phase 2)',
+    status: 'active',
+    statusLabel: 'Available Now',
     description:
       'Decode and inspect JSON Web Tokens locally using strict UTF-8 Base64URL parsing without server calls.',
     iconName: 'KeyRound',

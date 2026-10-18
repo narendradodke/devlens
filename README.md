@@ -18,6 +18,7 @@ DevLens is engineered as a client-side single-page application prioritizing priv
 - **Zero Telemetry**: No Google Analytics, Mixpanel, tracking pixels, or third-party cookies.
 - **Local Volatile Processing**: Sensitive inputs (JSON payloads, tokens, credentials, regex targets) never leave your browser tab and are not covertly persisted.
 - **Safe DOM Rendering**: Outputs are rendered exclusively through safe React elements and text nodes (no `eval()` or `dangerouslySetInnerHTML`).
+- **Signature Disclaimer**: JWT decoding is performed purely on the client side to inspect encoded claims. It does **not** cryptographically verify signatures or prove token authenticity.
 - **Planned Isolated Execution**: Resource-intensive tasks (such as planned regex matching) will run inside dedicated Web Workers with timeouts to protect your main UI thread.
 
 ---
@@ -38,12 +39,14 @@ DevLens is built phase-by-phase with honest verification before proceeding to su
    - **Statistics**: Instant character, line count, and byte size calculation.
    - **Actions**: One-click clipboard copy with permission error handling and `.json` file export.
 
-### 🟡 Planned Tools (Scheduled for Phase 2 & 3)
+2. **JWT Inspector** (`/jwt-inspector`)
+   - **Strict Base64URL Decoding**: Decodes header and payload segments using native `TextDecoder` UTF-8 byte reconstruction after normalizing `-`/`_` and adding required padding.
+   - **Claims Inspection**: Extracts and displays standard claims (`iss`, `sub`, `aud`, `exp`, `iat`, `nbf`, `jti`) with human-readable local dates and expiration status indicators.
+   - **Structured Panels**: Displays formatted JSON for header and payload, and displays the raw encoded signature segment with dedicated copy controls.
+   - **Prominent Security Warning**: Persistent notice that client-side decoding does not verify cryptographic signatures or token authenticity.
+   - **Volatile Execution**: Never persists tokens in `localStorage`, cookies, or session storage, and never transmits tokens over the network.
 
-2. **JWT Inspector** (`/jwt-inspector`) — _Phase 2 Target_
-   - Strict Base64URL parsing with native `TextDecoder` UTF-8 byte reconstruction.
-   - Decodes Header and Payload claims (`iss`, `sub`, `aud`, `exp`, `nbf`, `iat`).
-   - Prominent disclaimer that client-side decoding does not verify cryptographic signatures.
+### 🟡 Planned Tools (Scheduled for Remaining Phase 2 & 3)
 
 3. **Regex Playground** (`/regex-playground`) — _Phase 2 Target_
    - Isolated Web Worker execution with timeout protection against catastrophic backtracking (ReDoS).

@@ -44,8 +44,8 @@ export function HomePage() {
         </h1>
         <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-3xl leading-relaxed">
           A privacy-first suite of developer utilities running entirely in your browser. JSON Studio
-          is available now for formatting and validation, with upcoming tools scheduled across
-          development phases. Your data never leaves your device.
+          and JWT Inspector are available now for local in-memory processing, with upcoming tools
+          scheduled across development phases. Your data never leaves your device.
         </p>
       </section>
 
@@ -231,8 +231,8 @@ export function HomePage() {
               <span>Strict RFC Compliance</span>
             </div>
             <p className="text-slate-600 dark:text-slate-400 leading-relaxed">
-              Native JSON handling adheres to RFC 8259, with upcoming JWT inspection following
-              strict RFC 7519 Base64URL parsing and UTF-8 byte reconstruction.
+              Native JSON handling adheres to RFC 8259, and JWT inspection follows strict RFC 7519
+              Base64URL parsing and UTF-8 byte reconstruction.
             </p>
           </div>
           <div className="space-y-1.5">

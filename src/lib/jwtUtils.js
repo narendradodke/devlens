@@ -175,7 +175,7 @@ export function parseJwt(token, now = Date.now()) {
     if (formatted) {
       claims.exp = {
         ...formatted,
-        isExpired: now > payload.exp * 1000,
+        isExpired: now >= payload.exp * 1000,
       };
     }
   }
