@@ -32,4 +32,3 @@ If you discover a security vulnerability in DevLens, please report it responsibl
    - The potential security impact.
 
 We will review reports promptly and publish fixes in a transparent, timely manner.
-
