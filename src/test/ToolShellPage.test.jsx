@@ -1,0 +1,31 @@
+import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
+import { ToolShellPage } from '../pages/ToolShellPage';
+
+describe('ToolShellPage component', () => {
+  it('renders tool shell with planned specs for a valid tool', () => {
+    render(
+      <MemoryRouter initialEntries={['/jwt-inspector']}>
+        <ToolShellPage toolId="jwt-inspector" />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('JWT Inspector')).toBeInTheDocument();
+    expect(screen.getByText(/Phase 1 Active/i)).toBeInTheDocument();
+    expect(screen.getByText(/Planned Technical Capabilities/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Strict Base64URL decoding with UTF-8 byte reconstruction/i)
+    ).toBeInTheDocument();
+  });
+
+  it('renders not found notice for an invalid tool id', () => {
+    render(
+      <MemoryRouter initialEntries={['/unknown-tool']}>
+        <ToolShellPage toolId="unknown-tool" />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Tool Not Found')).toBeInTheDocument();
+  });
+});
