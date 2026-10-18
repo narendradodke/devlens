@@ -13,15 +13,25 @@ export function Sidebar({ onCloseMobile }) {
             end
             onClick={onCloseMobile}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+              `flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg border-l-4 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                 isActive
-                  ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
-                  : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                  ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold shadow-xs dark:border-blue-500 dark:bg-blue-950/60 dark:text-blue-300'
+                  : 'border-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-slate-100'
               }`
             }
           >
-            <Home className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-            <span>Overview & Directory</span>
+            {({ isActive }) => (
+              <>
+                <Home
+                  className={`h-4 w-4 ${
+                    isActive
+                      ? 'text-blue-600 dark:text-blue-400'
+                      : 'text-slate-500 dark:text-slate-400'
+                  }`}
+                />
+                <span>Overview & Directory</span>
+              </>
+            )}
           </NavLink>
         </div>
 
@@ -36,23 +46,37 @@ export function Sidebar({ onCloseMobile }) {
                 to={tool.path}
                 onClick={onCloseMobile}
                 className={({ isActive }) =>
-                  `flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  `flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg border-l-4 transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     isActive
-                      ? 'bg-blue-50 text-blue-700 font-semibold dark:bg-blue-950/50 dark:text-blue-300'
-                      : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 font-semibold shadow-xs dark:border-blue-500 dark:bg-blue-950/60 dark:text-blue-300'
+                      : 'border-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800/80 dark:hover:text-slate-100'
                   }`
                 }
               >
-                <div className="flex items-center gap-2.5 truncate">
-                  <ToolIcon
-                    name={tool.iconName}
-                    className="h-4 w-4 text-slate-500 dark:text-slate-400 shrink-0"
-                  />
-                  <span className="truncate">{tool.name}</span>
-                </div>
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
-                  {tool.phase}
-                </span>
+                {({ isActive }) => (
+                  <>
+                    <div className="flex items-center gap-2.5 truncate">
+                      <ToolIcon
+                        name={tool.iconName}
+                        className={`h-4 w-4 shrink-0 ${
+                          isActive
+                            ? 'text-blue-600 dark:text-blue-400'
+                            : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                      />
+                      <span className="truncate">{tool.name}</span>
+                    </div>
+                    <span
+                      className={`text-[10px] font-medium px-1.5 py-0.5 rounded border ${
+                        isActive
+                          ? 'border-blue-200 bg-blue-100 text-blue-800 dark:border-blue-800 dark:bg-blue-900/60 dark:text-blue-200'
+                          : 'border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400'
+                      }`}
+                    >
+                      {tool.id === 'json-studio' ? 'Active' : tool.phase}
+                    </span>
+                  </>
+                )}
               </NavLink>
             ))}
           </nav>

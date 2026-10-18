@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { Sun, Moon, ShieldCheck, Github, Menu, X, Layers } from 'lucide-react';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -41,12 +41,19 @@ export function Header({ isMobileMenuOpen, onToggleMobileMenu }) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link
+          <NavLink
             to="/"
-            className="hidden md:inline-flex text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 px-3 py-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            end
+            className={({ isActive }) =>
+              `hidden md:inline-flex text-xs font-medium px-3 py-1.5 rounded-md transition-colors ${
+                isActive
+                  ? 'bg-blue-50 text-blue-700 font-semibold dark:bg-blue-950/60 dark:text-blue-300'
+                  : 'text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100 hover:bg-slate-100 dark:hover:bg-slate-800'
+              }`
+            }
           >
             All Tools
-          </Link>
+          </NavLink>
 
           <button
             type="button"
