@@ -68,6 +68,22 @@ describe('JsonStudio Component', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 
+  it('renders live validation badge as user types JSON', () => {
+    render(<JsonStudio />);
+    const input = screen.getByPlaceholderText(/Paste or type your raw JSON here/i);
+
+    // Initial state: no badge
+    expect(screen.queryByTestId('live-validation-badge')).not.toBeInTheDocument();
+
+    // Type valid JSON
+    fireEvent.change(input, { target: { value: '{"key": "value"}' } });
+    expect(screen.getByTestId('live-validation-badge')).toHaveTextContent(/Valid \(object\)/i);
+
+    // Type invalid JSON
+    fireEvent.change(input, { target: { value: '{invalid}' } });
+    expect(screen.getByTestId('live-validation-badge')).toHaveTextContent(/Invalid/i);
+  });
+
   it('shows an alert box with the exact error on invalid JSON without crashing', async () => {
     const user = userEvent.setup();
     render(<JsonStudio />);

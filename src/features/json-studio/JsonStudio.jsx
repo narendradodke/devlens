@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   AlignLeft,
   Minimize2,
@@ -59,6 +59,12 @@ export function JsonStudio() {
   const inputStats = getJsonStats(input);
   const outputStats = getJsonStats(output);
 
+  // Live validation state for instant visual feedback
+  const liveValidation = useMemo(() => {
+    if (!input.trim()) return null;
+    return validateJson(input);
+  }, [input]);
+
   // Format JSON
   const handleFormat = useCallback(() => {
     if (!input.trim()) {
@@ -101,7 +107,7 @@ export function JsonStudio() {
     }
   }, [input]);
 
-  // Validate JSON
+  // Explicit Validate Action
   const handleValidate = useCallback(() => {
     if (!input.trim()) {
       setError('Please enter some JSON to validate.');
@@ -229,13 +235,40 @@ export function JsonStudio() {
         {/* Input Panel */}
         <div className="flex flex-col space-y-2">
           <div className="flex items-center justify-between text-xs">
-            <label
-              htmlFor="json-input"
-              className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5"
-            >
-              <FileCode className="w-4 h-4 text-slate-500" />
-              <span>Input JSON</span>
-            </label>
+            <div className="flex items-center gap-2">
+              <label
+                htmlFor="json-input"
+                className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1.5"
+              >
+                <FileCode className="w-4 h-4 text-slate-500" />
+                <span>Input JSON</span>
+              </label>
+
+              {/* Live Validation Badge */}
+              {liveValidation && (
+                <span
+                  data-testid="live-validation-badge"
+                  className={`inline-flex items-center gap-1 px-2 py-0.2 rounded-full text-[10px] font-semibold border ${
+                    liveValidation.isValid
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                      : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-950/60 dark:text-red-300 dark:border-red-800'
+                  }`}
+                >
+                  {liveValidation.isValid ? (
+                    <>
+                      <CheckCircle className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                      <span>Valid ({liveValidation.type})</span>
+                    </>
+                  ) : (
+                    <>
+                      <AlertCircle className="w-3 h-3 text-red-600 dark:text-red-400" />
+                      <span>Invalid</span>
+                    </>
+                  )}
+                </span>
+              )}
+            </div>
+
             <div className="text-[11px] text-slate-500 dark:text-slate-400 space-x-2">
               <span>{inputStats.characters} chars</span>
               <span>•</span>
@@ -296,7 +329,8 @@ export function JsonStudio() {
             <button
               type="button"
               onClick={handleValidate}
-              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+              aria-label="Validate JSON syntax"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-emerald-300 bg-emerald-50/50 text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-200 dark:hover:bg-emerald-900/60 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-colors"
             >
               <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
               <span>Validate</span>
