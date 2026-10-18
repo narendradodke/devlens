@@ -82,6 +82,28 @@ describe('JsonStudio Component', () => {
     // Type invalid JSON
     fireEvent.change(input, { target: { value: '{invalid}' } });
     expect(screen.getByTestId('live-validation-badge')).toHaveTextContent(/Invalid/i);
+
+    // Clear input: badge disappears
+    fireEvent.change(input, { target: { value: '' } });
+    expect(screen.queryByTestId('live-validation-badge')).not.toBeInTheDocument();
+  });
+
+  it('validates primitive values such as null and boolean through the Validate button', async () => {
+    const user = userEvent.setup();
+    render(<JsonStudio />);
+
+    const input = screen.getByPlaceholderText(/Paste or type your raw JSON here/i);
+    const validateBtn = screen.getByRole('button', { name: /Validate/i });
+
+    // Validate null
+    fireEvent.change(input, { target: { value: 'null' } });
+    await user.click(validateBtn);
+    expect(screen.getByRole('status')).toHaveTextContent(/Null primitive/i);
+
+    // Validate boolean
+    fireEvent.change(input, { target: { value: 'false' } });
+    await user.click(validateBtn);
+    expect(screen.getByRole('status')).toHaveTextContent(/Boolean primitive/i);
   });
 
   it('shows an alert box with the exact error on invalid JSON without crashing', async () => {
