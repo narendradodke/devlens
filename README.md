@@ -17,7 +17,8 @@ DevLens is engineered as a client-side single-page application prioritizing priv
 - **No Backend Server**: There is no server-side runtime, Express, Python, or Go service.
 - **Zero Telemetry**: No Google Analytics, Mixpanel, tracking pixels, or third-party cookies.
 - **Local Volatile Processing**: Sensitive inputs (JSON payloads, tokens, credentials, regex targets) never leave your browser tab and are not covertly persisted.
-- **Isolated Execution**: Resource-intensive tasks (such as planned regex matching) will run inside dedicated Web Workers with timeouts to protect your main UI thread.
+- **Safe DOM Rendering**: Outputs are rendered exclusively through safe React elements and text nodes (no `eval()` or `dangerouslySetInnerHTML`).
+- **Planned Isolated Execution**: Resource-intensive tasks (such as planned regex matching) will run inside dedicated Web Workers with timeouts to protect your main UI thread.
 
 ---
 
@@ -28,11 +29,14 @@ DevLens is built phase-by-phase with honest verification before proceeding to su
 ### 🟢 Implemented & Active Tools
 
 1. **JSON Studio** (`/json-studio`)
-   - **Pretty-Printing**: Formats raw JSON with 2-space indentation.
-   - **Minification**: Compresses valid JSON into a compact single line.
-   - **Validation Engine**: Real-time syntax validation identifying error positions and data types (Objects, Arrays, Primitives, and Null).
+   - **Pretty-Printing**: Formats raw JSON with standard 2-space indentation.
+   - **Minification**: Compresses valid JSON into a compact single-line payload.
+   - **Real Validate Action**: Dedicated `Validate` button powered by `validateJson()` that verifies syntax without mutating input, displaying detailed structure breakdowns (Objects, Arrays, Strings, Numbers, Booleans, and Null).
+   - **Live Validation Badge**: Real-time visual indicator in the editor header showing immediate syntax validity as you type.
+   - **Safe Download Lifecycle**: Downloads valid JSON with delayed Blob URL cleanup (`URL.revokeObjectURL`) to ensure browser download completion across all engines.
+   - **Unmount Safety**: Active timers for clipboard feedback and download cleanups are safely disposed of upon component unmount.
    - **Statistics**: Instant character, line count, and byte size calculation.
-   - **Actions**: One-click clipboard copy (with error handling) and `.json` file download with safe Blob URL lifecycle management.
+   - **Actions**: One-click clipboard copy with permission error handling and `.json` file export.
 
 ### 🟡 Planned Tools (Scheduled for Phase 2 & 3)
 

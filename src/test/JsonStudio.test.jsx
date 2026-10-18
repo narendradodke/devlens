@@ -239,4 +239,26 @@ describe('JsonStudio Component', () => {
     // Unmount immediately while timer is ticking
     expect(() => unmount()).not.toThrow();
   });
+
+  it('safely unmounts without error when download timer is scheduled', async () => {
+    const user = userEvent.setup();
+    const createObjectURLMock = vi.fn().mockReturnValue('blob:mock-url');
+    const revokeObjectURLMock = vi.fn();
+    window.URL.createObjectURL = createObjectURLMock;
+    window.URL.revokeObjectURL = revokeObjectURLMock;
+    const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+    const { unmount } = render(<JsonStudio />);
+
+    const sampleBtn = screen.getByRole('button', { name: /Load Sample JSON/i });
+    await user.click(sampleBtn);
+
+    const downloadBtn = screen.getByRole('button', { name: /Download JSON/i });
+    await user.click(downloadBtn);
+
+    clickSpy.mockRestore();
+
+    // Unmount immediately while download revoke timeout is active
+    expect(() => unmount()).not.toThrow();
+  });
 });

@@ -4,11 +4,11 @@
 
 DevLens is designed from the ground up as a **privacy-first, client-only developer toolkit**. Our security architecture adheres to these principles:
 
-1. **Zero External Data Transmission**: All data manipulation (JSON formatting, token decoding, regex execution, string encoding) happens strictly in-memory within your local browser. DevLens makes zero outbound network requests with user input.
-2. **Volatile Storage by Default**: No user-entered tokens, keys, passwords, or payloads are saved to persistent browser storage (`localStorage` or `IndexedDB`) unless an explicit local export action is taken.
-3. **Safe Rendering**: All dynamic outputs and search terms are rendered via React elements and native text nodes. The use of `eval()`, `new Function()`, or `dangerouslySetInnerHTML` is strictly prohibited to prevent Cross-Site Scripting (XSS).
-4. **Execution Isolation**: CPU-intensive operations (such as regex matching) are isolated inside Web Workers with execution timeouts to prevent tab freezing and Denial of Service (ReDoS).
-5. **No Cryptographic Guarantees for Decoding**: Client-side decoding (e.g., JWT header/payload decoding or Base64 decoding) does **not** establish cryptographic validity or signature verification. DevLens explicitly warns users that token decoding does not prove authenticity.
+1. **Zero External Data Transmission**: All utility processing (currently active JSON formatting, minification, and validation; and planned token decoding, regex evaluation, and string conversion) runs strictly in-memory inside your local browser tab. DevLens makes zero outbound network requests with user input.
+2. **Volatile Storage by Default**: No user-entered JSON payloads, keys, credentials, or tokens are saved to persistent browser storage (`localStorage` or `IndexedDB`) without explicit user action.
+3. **Safe DOM Rendering**: All dynamic outputs, syntax messages, and search queries are rendered using native text nodes and safe React elements. The use of `eval()`, `new Function()`, or `dangerouslySetInnerHTML` is strictly prohibited to prevent Cross-Site Scripting (XSS).
+4. **Execution Isolation (Planned)**: Resource-heavy operations (specifically the upcoming regular expression engine in Phase 2) will be isolated within Web Workers with execution timeouts to protect the main UI thread from Denial of Service (ReDoS).
+5. **No Cryptographic Guarantees for Decoding (Planned)**: Upcoming client-side decoding (such as JWT inspection in Phase 2) will explicitly warn users that decoding token structure does not establish cryptographic authenticity or signature validity.
 
 ---
 
