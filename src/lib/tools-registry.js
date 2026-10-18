@@ -5,17 +5,19 @@ export const TOOLS = [
     shortName: 'JSON Studio',
     path: '/json-studio',
     category: 'Formatters & Validators',
+    status: 'active',
+    statusLabel: 'Available Now',
     description:
-      'Format, minify, validate, and inspect JSON with clean syntax error reporting and statistics.',
+      'Format, minify, validate, and inspect JSON with clean syntax error reporting, statistics, and export.',
     iconName: 'Braces',
     phase: 'Phase 2',
     tags: ['json', 'format', 'minify', 'validate', 'syntax', 'beautify'],
     features: [
-      'Pretty-printing with customizable indentation',
-      'Minification and syntax validation',
-      'Detailed syntax error reporting with character positions',
+      'Pretty-printing with standard 2-space indentation',
+      'Minification into single-line payload',
+      'Real-time syntax validation with detailed type breakdown',
       'Download valid JSON file and copy output safely',
-      'Local character and line statistics',
+      'Local character, line, and byte size statistics',
     ],
   },
   {
@@ -24,6 +26,8 @@ export const TOOLS = [
     shortName: 'JWT',
     path: '/jwt-inspector',
     category: 'Security & Auth',
+    status: 'planned',
+    statusLabel: 'Planned (Phase 2)',
     description:
       'Decode and inspect JSON Web Tokens locally using strict UTF-8 Base64URL parsing without server calls.',
     iconName: 'KeyRound',
@@ -43,6 +47,8 @@ export const TOOLS = [
     shortName: 'Regex',
     path: '/regex-playground',
     category: 'Text & Parsing',
+    status: 'planned',
+    statusLabel: 'Planned (Phase 2)',
     description:
       'Test regular expressions safely inside an isolated Web Worker with XSS-safe JSX match highlighting.',
     iconName: 'Regex',
@@ -62,6 +68,8 @@ export const TOOLS = [
     shortName: 'JSON Diff',
     path: '/json-diff',
     category: 'Data Comparison',
+    status: 'planned',
+    statusLabel: 'Planned (Phase 2)',
     description:
       'Compare two JSON documents with deep object and array traversal, path detection, and change badges.',
     iconName: 'GitCompare',
@@ -81,6 +89,8 @@ export const TOOLS = [
     shortName: 'Encode/Decode',
     path: '/encode-decode',
     category: 'Encoding Utilities',
+    status: 'planned',
+    statusLabel: 'Planned (Phase 2)',
     description:
       'Convert between URL components, Base64, and raw text with robust Unicode UTF-8 handling.',
     iconName: 'Binary',
@@ -100,6 +110,8 @@ export const TOOLS = [
     shortName: 'Recipes',
     path: '/recipes',
     category: 'Workflows & Presets',
+    status: 'planned',
+    statusLabel: 'Planned (Phase 3)',
     description:
       'Save, import, and export reusable tool configurations with strict JSON schema and size validation.',
     iconName: 'BookMarked',

@@ -12,45 +12,53 @@
 
 ## 🔒 Privacy & Architecture Guarantees
 
-DevLens is built strictly as a client-side single-page application:
+DevLens is engineered as a client-side single-page application prioritizing privacy:
 
-- **No Backend Server**: There is no Express, Fastify, Python, or Go backend.
+- **No Backend Server**: There is no server-side runtime, Express, Python, or Go service.
 - **Zero Telemetry**: No Google Analytics, Mixpanel, tracking pixels, or third-party cookies.
 - **Local Volatile Processing**: Sensitive inputs (JSON payloads, tokens, credentials, regex targets) never leave your browser tab and are not covertly persisted.
-- **Isolated Execution**: Resource-intensive tasks (such as regex matching) run inside dedicated Web Workers with timeouts to protect your main UI thread.
+- **Isolated Execution**: Resource-intensive tasks (such as planned regex matching) will run inside dedicated Web Workers with timeouts to protect your main UI thread.
 
 ---
 
-## 🛠️ The 5 Core Tools
+## 🛠️ Tool Status & Roadmap
 
-1. **JSON Studio**
-   - Pretty-print and format JSON with indentation.
-   - Fast minification for production payloads.
-   - Precise syntax error diagnosis with exact line and character positions.
-   - One-click copy, JSON file download, and real-time statistics (characters, lines, byte size).
+DevLens is built phase-by-phase with honest verification before proceeding to subsequent modules:
 
-2. **JWT Inspector**
+### 🟢 Implemented & Active Tools
+
+1. **JSON Studio** (`/json-studio`)
+   - **Pretty-Printing**: Formats raw JSON with 2-space indentation.
+   - **Minification**: Compresses valid JSON into a compact single line.
+   - **Validation Engine**: Real-time syntax validation identifying error positions and data types (Objects, Arrays, Primitives, and Null).
+   - **Statistics**: Instant character, line count, and byte size calculation.
+   - **Actions**: One-click clipboard copy (with error handling) and `.json` file download with safe Blob URL lifecycle management.
+
+### 🟡 Planned Tools (Scheduled for Phase 2 & 3)
+
+2. **JWT Inspector** (`/jwt-inspector`) — _Phase 2 Target_
    - Strict Base64URL parsing with native `TextDecoder` UTF-8 byte reconstruction.
-   - Decodes and displays Header and Payload claims (`iss`, `sub`, `aud`, `exp`, `nbf`, `iat`).
-   - Human-readable expiration status calculations.
-   - Prominent notice that client-side decoding does not verify cryptographic signatures.
+   - Decodes Header and Payload claims (`iss`, `sub`, `aud`, `exp`, `nbf`, `iat`).
+   - Prominent disclaimer that client-side decoding does not verify cryptographic signatures.
 
-3. **Regex Playground**
-   - Regular expression testing executed inside an isolated Web Worker.
-   - Guarded against catastrophic backtracking (ReDoS) with execution timeout termination.
+3. **Regex Playground** (`/regex-playground`) — _Phase 2 Target_
+   - Isolated Web Worker execution with timeout protection against catastrophic backtracking (ReDoS).
    - 100% XSS-safe JSX highlighting using `<mark>` elements (never uses `dangerouslySetInnerHTML`).
    - Match counting, start/end indices, and capture group extraction.
 
-4. **JSON Diff**
+4. **JSON Diff** (`/json-diff`) — _Phase 2 Target_
    - Side-by-side structural comparison of two JSON objects.
    - Deep key traversal detecting Added, Removed, and Modified values with complete JSON paths.
    - Index-aware array diffing to avoid misleading whole-array replacement dumps.
-   - Visual color coding paired with text labels and icons for full accessibility.
 
-5. **Encode / Decode Lab**
+5. **Encode / Decode Lab** (`/encode-decode`) — _Phase 2 Target_
    - Component-level URL encoding and decoding (`encodeURIComponent`).
    - Unicode-safe UTF-8 Base64 encoding and decoding.
    - Clear diagnostic feedback for malformed padding or invalid characters.
+
+6. **Recipe Manager** (`/recipes`) — _Phase 3 Target_
+   - Save, view, and reuse allowlisted tool configurations.
+   - Strict 1 MB file size enforcement and schema validation on JSON import/export.
 
 ---
 
@@ -111,6 +119,8 @@ DevLens is built strictly as a client-side single-page application:
 
 ---
 
-## 📄 License
+## 📄 License & Contributing
 
-DevLens is free, open-source software released under the [MIT License](LICENSE).
+- Code is released under the [MIT License](LICENSE).
+- Contribution guidelines are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+- Security policy and vulnerability reporting are available in [SECURITY.md](SECURITY.md).

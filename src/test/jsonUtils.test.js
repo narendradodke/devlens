@@ -23,6 +23,13 @@ describe('jsonUtils unit tests', () => {
       });
     });
 
+    it('formats valid JSON primitives including null, boolean, and number', () => {
+      expect(formatJson('null')).toBe('null');
+      expect(formatJson('true')).toBe('true');
+      expect(formatJson('123')).toBe('123');
+      expect(formatJson('"quoted string"')).toBe('"quoted string"');
+    });
+
     it('throws SyntaxError on malformed JSON', () => {
       const broken = '{"a": 1, trailing,}';
       expect(() => formatJson(broken)).toThrow(SyntaxError);
@@ -46,6 +53,12 @@ describe('jsonUtils unit tests', () => {
       expect(minifyJson(input)).toBe('[1,2,{"k":"v"}]');
     });
 
+    it('minifies primitives including null and numbers', () => {
+      expect(minifyJson('null')).toBe('null');
+      expect(minifyJson('42')).toBe('42');
+      expect(minifyJson('"text"')).toBe('"text"');
+    });
+
     it('throws SyntaxError on invalid JSON', () => {
       expect(() => minifyJson('{unquotedKey: 123}')).toThrow(SyntaxError);
       expect(() => minifyJson('')).toThrow(SyntaxError);
@@ -53,10 +66,32 @@ describe('jsonUtils unit tests', () => {
   });
 
   describe('validateJson', () => {
-    it('returns isValid true and error null for valid JSON', () => {
-      const result = validateJson('{"status": "ok"}');
+    it('validates JSON objects and reports key count', () => {
+      const result = validateJson('{"status": "ok", "code": 200}');
       expect(result.isValid).toBe(true);
       expect(result.error).toBeNull();
+      expect(result.type).toBe('object');
+      expect(result.details).toContain('2 keys');
+    });
+
+    it('validates JSON arrays and reports item count', () => {
+      const result = validateJson('[1, 2, 3]');
+      expect(result.isValid).toBe(true);
+      expect(result.type).toBe('array');
+      expect(result.details).toContain('3 items');
+    });
+
+    it('validates null primitive correctly', () => {
+      const result = validateJson('null');
+      expect(result.isValid).toBe(true);
+      expect(result.type).toBe('null');
+      expect(result.details).toContain('Null primitive');
+    });
+
+    it('validates boolean and number primitives', () => {
+      expect(validateJson('true').type).toBe('boolean');
+      expect(validateJson('999').type).toBe('number');
+      expect(validateJson('"sample string"').type).toBe('string');
     });
 
     it('returns isValid false with error message for invalid JSON', () => {
@@ -79,6 +114,12 @@ describe('jsonUtils unit tests', () => {
       expect(stats.characters).toBe(text.length);
       expect(stats.lines).toBe(3);
       expect(stats.byteSize).toBe(text.length);
+    });
+
+    it('calculates multibyte UTF-8 characters accurately', () => {
+      const unicodeText = '{"emoji": "🚀", "currency": "₹"}';
+      const stats = getJsonStats(unicodeText);
+      expect(stats.byteSize).toBeGreaterThan(stats.characters);
     });
 
     it('handles empty input gracefully', () => {

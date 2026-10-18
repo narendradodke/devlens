@@ -73,7 +73,7 @@ export function Sidebar({ onCloseMobile }) {
                           : 'border-slate-200 text-slate-500 dark:border-slate-700 dark:text-slate-400'
                       }`}
                     >
-                      {tool.id === 'json-studio' ? 'Active' : tool.phase}
+                      {tool.status === 'active' ? 'Active' : tool.phase}
                     </span>
                   </>
                 )}

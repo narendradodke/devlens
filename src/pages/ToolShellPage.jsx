@@ -44,7 +44,7 @@ export function ToolShellPage({ toolId }) {
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-bold text-slate-900 dark:text-white">{tool.name}</h1>
               <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
-                {tool.phase} Target
+                {tool.statusLabel || `${tool.phase} Target`}
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -58,13 +58,12 @@ export function ToolShellPage({ toolId }) {
       <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 space-y-2">
         <div className="flex items-center gap-2 font-semibold text-sm">
           <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-          <span>Phase 1 Active — Tool Implementation Scheduled for {tool.phase}</span>
+          <span>Planned Tool — Implementation Scheduled for {tool.phase}</span>
         </div>
         <p className="text-xs leading-relaxed text-amber-800 dark:text-amber-300">
-          In strict compliance with the development specification, interactive utilities are not
-          implemented during Phase 1 (Foundation). This route provides the verified architectural
-          shell, navigation, and testing foundation. The functional logic will be constructed upon
-          user approval of Phase 2.
+          In strict compliance with the project roadmap, interactive utilities are constructed and
+          verified phase-by-phase. This specification shell outlines the technical requirements,
+          privacy guarantees, and interface design scheduled for implementation in {tool.phase}.
         </p>
       </div>
 

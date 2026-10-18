@@ -1,7 +1,8 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import {
   AlignLeft,
   Minimize2,
+  CheckCircle,
   Copy,
   Check,
   Download,
@@ -10,7 +11,7 @@ import {
   FileCode,
   Sparkles,
 } from 'lucide-react';
-import { formatJson, minifyJson, getJsonStats } from '../../lib/jsonUtils';
+import { formatJson, minifyJson, validateJson, getJsonStats } from '../../lib/jsonUtils';
 
 const SAMPLE_JSON = JSON.stringify(
   {
@@ -36,8 +37,24 @@ export function JsonStudio() {
   const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
   const [error, setError] = useState(null);
+  const [validationSuccess, setValidationSuccess] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [lastAction, setLastAction] = useState(null); // 'formatted' | 'minified'
+  const [lastAction, setLastAction] = useState(null); // 'formatted' | 'minified' | 'validated'
+
+  const copiedTimeoutRef = useRef(null);
+  const downloadTimeoutRef = useRef(null);
+
+  // Clean up timers on unmount to prevent state updates on unmounted component
+  useEffect(() => {
+    return () => {
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+      if (downloadTimeoutRef.current) {
+        clearTimeout(downloadTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const inputStats = getJsonStats(input);
   const outputStats = getJsonStats(output);
@@ -46,6 +63,7 @@ export function JsonStudio() {
   const handleFormat = useCallback(() => {
     if (!input.trim()) {
       setError('Please enter some JSON to format.');
+      setValidationSuccess(null);
       setOutput('');
       return;
     }
@@ -53,9 +71,11 @@ export function JsonStudio() {
       const formatted = formatJson(input, 2);
       setOutput(formatted);
       setError(null);
+      setValidationSuccess(null);
       setLastAction('formatted');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid JSON syntax');
+      setValidationSuccess(null);
       setOutput('');
     }
   }, [input]);
@@ -64,6 +84,7 @@ export function JsonStudio() {
   const handleMinify = useCallback(() => {
     if (!input.trim()) {
       setError('Please enter some JSON to minify.');
+      setValidationSuccess(null);
       setOutput('');
       return;
     }
@@ -71,10 +92,31 @@ export function JsonStudio() {
       const minified = minifyJson(input);
       setOutput(minified);
       setError(null);
+      setValidationSuccess(null);
       setLastAction('minified');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Invalid JSON syntax');
+      setValidationSuccess(null);
       setOutput('');
+    }
+  }, [input]);
+
+  // Validate JSON
+  const handleValidate = useCallback(() => {
+    if (!input.trim()) {
+      setError('Please enter some JSON to validate.');
+      setValidationSuccess(null);
+      return;
+    }
+
+    const result = validateJson(input);
+    if (result.isValid) {
+      setValidationSuccess(result.message);
+      setError(null);
+      setLastAction('validated');
+    } else {
+      setError(result.error);
+      setValidationSuccess(null);
     }
   }, [input]);
 
@@ -83,6 +125,7 @@ export function JsonStudio() {
     setInput('');
     setOutput('');
     setError(null);
+    setValidationSuccess(null);
     setCopied(false);
     setLastAction(null);
   }, []);
@@ -91,6 +134,7 @@ export function JsonStudio() {
   const handleLoadSample = useCallback(() => {
     setInput(SAMPLE_JSON);
     setError(null);
+    setValidationSuccess(null);
     try {
       const formatted = formatJson(SAMPLE_JSON, 2);
       setOutput(formatted);
@@ -106,9 +150,18 @@ export function JsonStudio() {
     try {
       await navigator.clipboard.writeText(output);
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      setError('Failed to copy to clipboard. Please check browser permissions.');
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+      copiedTimeoutRef.current = setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Failed to copy: ${err.message}`
+          : 'Failed to copy to clipboard. Please check browser permissions.'
+      );
     }
   }, [output]);
 
@@ -125,9 +178,20 @@ export function JsonStudio() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch {
-      setError('Failed to trigger file download.');
+
+      // Safe cleanup: revoke after 1 second so browser download manager has completed reading
+      if (downloadTimeoutRef.current) {
+        clearTimeout(downloadTimeoutRef.current);
+      }
+      downloadTimeoutRef.current = setTimeout(() => {
+        URL.revokeObjectURL(url);
+      }, 1000);
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? `Download failed: ${err.message}`
+          : 'Failed to trigger file download.'
+      );
     }
   }, [output, lastAction]);
 
@@ -188,13 +252,23 @@ export function JsonStudio() {
               onChange={(e) => {
                 setInput(e.target.value);
                 if (error) setError(null);
+                if (validationSuccess) setValidationSuccess(null);
               }}
               placeholder='Paste or type your raw JSON here... e.g. {"name": "DevLens", "privacy": true}'
               spellCheck="false"
+              aria-describedby={
+                error
+                  ? 'json-syntax-error'
+                  : validationSuccess
+                    ? 'json-validation-status'
+                    : undefined
+              }
               className={`w-full h-80 sm:h-96 p-3.5 font-mono text-xs rounded-xl border bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 transition-all resize-y ${
                 error
                   ? 'border-red-400 focus:ring-red-500 dark:border-red-600'
-                  : 'border-slate-300 dark:border-slate-700 focus:ring-blue-500'
+                  : validationSuccess
+                    ? 'border-emerald-400 focus:ring-emerald-500 dark:border-emerald-600'
+                    : 'border-slate-300 dark:border-slate-700 focus:ring-blue-500'
               }`}
             />
           </div>
@@ -221,8 +295,17 @@ export function JsonStudio() {
 
             <button
               type="button"
+              onClick={handleValidate}
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
+            >
+              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Validate</span>
+            </button>
+
+            <button
+              type="button"
               onClick={handleClear}
-              disabled={!input && !output && !error}
+              disabled={!input && !output && !error && !validationSuccess}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors ml-auto"
             >
               <Trash2 className="w-3.5 h-3.5" />
@@ -230,9 +313,25 @@ export function JsonStudio() {
             </button>
           </div>
 
+          {/* Validation Success Alert Box */}
+          {validationSuccess && (
+            <div
+              id="json-validation-status"
+              role="status"
+              className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5 text-xs text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300 space-y-1 animate-in fade-in duration-150"
+            >
+              <div className="flex items-center gap-1.5 font-semibold text-emerald-900 dark:text-emerald-200">
+                <CheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                <span>JSON Syntax Valid</span>
+              </div>
+              <p className="font-mono text-[11px] break-words pl-5">{validationSuccess}</p>
+            </div>
+          )}
+
           {/* Error Message Alert Box */}
           {error && (
             <div
+              id="json-syntax-error"
               role="alert"
               className="rounded-xl border border-red-200 bg-red-50 p-3.5 text-xs text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300 space-y-1 animate-in fade-in duration-150"
             >
@@ -256,7 +355,13 @@ export function JsonStudio() {
               <span>Output JSON</span>
               {lastAction && (
                 <span className="text-[10px] font-normal text-slate-500">
-                  ({lastAction === 'formatted' ? '2-space indentation' : 'minified single line'})
+                  (
+                  {lastAction === 'formatted'
+                    ? '2-space indentation'
+                    : lastAction === 'minified'
+                      ? 'minified single line'
+                      : 'validated'}
+                  )
                 </span>
               )}
             </label>
@@ -286,6 +391,7 @@ export function JsonStudio() {
               type="button"
               onClick={handleCopy}
               disabled={!output}
+              aria-label={copied ? 'Output copied to clipboard' : 'Copy output JSON to clipboard'}
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               {copied ? (
@@ -305,6 +411,7 @@ export function JsonStudio() {
               type="button"
               onClick={handleDownload}
               disabled={!output}
+              aria-label="Download JSON file to local disk"
               className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors"
             >
               <Download className="w-3.5 h-3.5" />

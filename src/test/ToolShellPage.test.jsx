@@ -12,7 +12,7 @@ describe('ToolShellPage component', () => {
     );
 
     expect(screen.getByText('JWT Inspector')).toBeInTheDocument();
-    expect(screen.getByText(/Phase 1 Active/i)).toBeInTheDocument();
+    expect(screen.getByText(/Planned Tool — Implementation Scheduled for/i)).toBeInTheDocument();
     expect(screen.getByText(/Planned Technical Capabilities/i)).toBeInTheDocument();
     expect(
       screen.getByText(/Strict Base64URL decoding with UTF-8 byte reconstruction/i)

@@ -38,28 +38,56 @@ export function minifyJson(input) {
 
 /**
  * Validate JSON string and return diagnostic information.
+ * Correctly distinguishes objects, arrays, string primitives, numbers, booleans, and null.
  *
  * @param {string} input - Raw JSON string
- * @returns {{ isValid: boolean, error: string | null }}
+ * @returns {{ isValid: boolean, error: string | null, type?: string | null, details?: string | null, message?: string }}
  */
 export function validateJson(input) {
   if (typeof input !== 'string' || input.trim() === '') {
     return {
       isValid: false,
-      error: 'Input is empty.',
+      error: 'Input cannot be empty. Please provide a valid JSON string.',
+      type: null,
+      details: null,
     };
   }
 
   try {
-    JSON.parse(input);
+    const parsed = JSON.parse(input);
+    let type = typeof parsed;
+    let details = '';
+
+    if (parsed === null) {
+      type = 'null';
+      details = 'Null primitive value';
+    } else if (Array.isArray(parsed)) {
+      type = 'array';
+      details = `Array with ${parsed.length} item${parsed.length === 1 ? '' : 's'}`;
+    } else if (type === 'object') {
+      const keyCount = Object.keys(parsed).length;
+      details = `Object with ${keyCount} key${keyCount === 1 ? '' : 's'}`;
+    } else if (type === 'string') {
+      details = `String primitive (${parsed.length} character${parsed.length === 1 ? '' : 's'})`;
+    } else if (type === 'number') {
+      details = `Number primitive (${parsed})`;
+    } else if (type === 'boolean') {
+      details = `Boolean primitive (${parsed})`;
+    }
+
     return {
       isValid: true,
       error: null,
+      type,
+      details,
+      message: `Valid JSON syntax — ${details}`,
     };
   } catch (err) {
     return {
       isValid: false,
       error: err instanceof Error ? err.message : 'Invalid JSON syntax',
+      type: null,
+      details: null,
     };
   }
 }
