@@ -4,6 +4,8 @@ import { Layout } from './components/layout/Layout';
 import { HomePage } from './pages/HomePage';
 import { JsonStudio } from './features/json-studio/JsonStudio';
 import { JwtInspector } from './features/jwt-inspector/JwtInspector';
+import { RegexPlayground } from './features/regex-playground/RegexPlayground';
+import { JsonDiff } from './features/json-diff/JsonDiff';
 import { ToolShellPage } from './pages/ToolShellPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 
@@ -16,8 +18,8 @@ export function App() {
             <Route index element={<HomePage />} />
             <Route path="json-studio" element={<JsonStudio />} />
             <Route path="jwt-inspector" element={<JwtInspector />} />
-            <Route path="regex-playground" element={<ToolShellPage toolId="regex-playground" />} />
-            <Route path="json-diff" element={<ToolShellPage toolId="json-diff" />} />
+            <Route path="regex-playground" element={<RegexPlayground />} />
+            <Route path="json-diff" element={<JsonDiff />} />
             <Route path="encode-decode" element={<ToolShellPage toolId="encode-decode" />} />
             <Route path="recipes" element={<ToolShellPage toolId="recipes" />} />
             <Route path="*" element={<NotFoundPage />} />

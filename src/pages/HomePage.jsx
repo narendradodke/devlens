@@ -43,9 +43,10 @@ export function HomePage() {
           DevLens Developer Toolkit
         </h1>
         <p className="text-base sm:text-lg text-slate-600 dark:text-slate-300 max-w-3xl leading-relaxed">
-          A privacy-first suite of developer utilities running entirely in your browser. JSON Studio
-          and JWT Inspector are available now for local in-memory processing, with upcoming tools
-          scheduled across development phases. Your data never leaves your device.
+          A privacy-first suite of developer utilities running entirely in your browser. JSON
+          Studio, JWT Inspector, Regex Playground, and JSON Diff are available now for local
+          in-memory processing, with upcoming tools scheduled across development phases. Your data
+          never leaves your device.
         </p>
       </section>
 

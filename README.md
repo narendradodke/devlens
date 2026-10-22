@@ -46,17 +46,25 @@ DevLens is built phase-by-phase with honest verification before proceeding to su
    - **Prominent Security Warning**: Persistent notice that client-side decoding does not verify cryptographic signatures or token authenticity.
    - **Volatile Execution**: Never persists tokens in `localStorage`, cookies, or session storage, and never transmits tokens over the network.
 
+3. **Regex Playground** (`/regex-playground`)
+   - **Real-Time Match Highlighting**: Safely highlights regex matches directly using standard React elements without `dangerouslySetInnerHTML`.
+   - **Flag Controls**: Accessible toggle buttons for standard JavaScript regex flags (`g`, `i`, `m`, `s`, `u`).
+   - **Match Details Inspector**: Reports match text, character index ranges (`start..end`), match lengths, and captured group hierarchies (including named groups).
+   - **Zero-Length Match Safety**: Guards against infinite loops when evaluating patterns that match empty strings (e.g., `^`, `$`, `\b`, `a*`) with Unicode surrogate-pair preservation.
+   - **Safe Match Capping**: Protects UI memory with a 5,000-match display ceiling with accurate excess detection and export indicators.
+   - **Actions & Export**: Pre-configured email extraction sample, copy pattern (`/pattern/flags`), and copy matches formatted as plain text or JSON.
+   - **Performance Notice**: Regular expressions execute synchronously on the browser thread. While output is capped to avoid memory exhaustion, complex exponential backtracking patterns (ReDoS) can freeze the UI tab.
+
+4. **JSON Diff** (`/json-diff`)
+   - **Dual Editor Interface**: Independent side-by-side JSON text inputs with character, line, and byte size indicators.
+   - **Structural Normalization**: Whitespace, formatting, indentation, and object property key ordering are normalized (0 differences reported for semantically identical JSON).
+   - **Deep Traversal**: Traverses nested objects and arrays to detect Added, Removed, and Modified values with complete JSONPath notation (`$.path.to.key`).
+   - **Index-Aware Array Comparison**: Compares array elements positionally and reports length discrepancies accurately.
+   - **Interactive Filtering & Search**: Filter diff records by type (`Added`, `Removed`, `Modified`) and search by JSONPath or value text.
+   - **Export Options**: Copy diffs formatted as plain text or structured JSON with clipboard permission handling.
+   - **100% In-Browser Execution**: All diffing executes locally in browser memory without sending data to servers.
+
 ### 🟡 Planned Tools (Scheduled for Remaining Phase 2 & 3)
-
-3. **Regex Playground** (`/regex-playground`) — _Phase 2 Target_
-   - Isolated Web Worker execution with timeout protection against catastrophic backtracking (ReDoS).
-   - 100% XSS-safe JSX highlighting using `<mark>` elements (never uses `dangerouslySetInnerHTML`).
-   - Match counting, start/end indices, and capture group extraction.
-
-4. **JSON Diff** (`/json-diff`) — _Phase 2 Target_
-   - Side-by-side structural comparison of two JSON objects.
-   - Deep key traversal detecting Added, Removed, and Modified values with complete JSON paths.
-   - Index-aware array diffing to avoid misleading whole-array replacement dumps.
 
 5. **Encode / Decode Lab** (`/encode-decode`) — _Phase 2 Target_
    - Component-level URL encoding and decoding (`encodeURIComponent`).
