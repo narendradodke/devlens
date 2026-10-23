@@ -301,6 +301,22 @@ describe('jsonDiffUtils Unit Tests', () => {
       expect(result.rightError).not.toBeNull();
       expect(result.diffs).toHaveLength(0);
     });
+
+    it('rejects oversized left input exceeding MAX_JSON_DIFF_INPUT_LENGTH', () => {
+      const oversized = '{"val": "' + 'x'.repeat(5000000) + '"}';
+      const result = compareJsonStrings(oversized, '{"a": 1}');
+      expect(result.leftError).toContain('exceeds maximum supported size of 5 MB');
+      expect(result.rightError).toBeNull();
+      expect(result.diffs).toHaveLength(0);
+    });
+
+    it('rejects oversized right input exceeding MAX_JSON_DIFF_INPUT_LENGTH', () => {
+      const oversized = '{"val": "' + 'x'.repeat(5000000) + '"}';
+      const result = compareJsonStrings('{"a": 1}', oversized);
+      expect(result.leftError).toBeNull();
+      expect(result.rightError).toContain('exceeds maximum supported size of 5 MB');
+      expect(result.diffs).toHaveLength(0);
+    });
   });
 
   describe('SAMPLE_ORIGINAL_JSON and SAMPLE_MODIFIED_JSON', () => {
@@ -360,9 +376,48 @@ describe('jsonDiffUtils Unit Tests', () => {
       expect(parsed.differences[0].path).toBe('$.version');
     });
 
-    it('returns identical document notification in text export when diffs array is empty', () => {
+    it('returns identical document notification in text export when diffs array is empty and not truncated', () => {
       const text = formatDiffAsText([], { added: 0, removed: 0, modified: 0, total: 0 });
       expect(text).toContain('structurally identical');
+    });
+
+    it('does not claim documents are identical when diffs array is empty but truncated is true', () => {
+      const zeroStats = { added: 0, removed: 0, modified: 0, total: 0 };
+      const text = formatDiffAsText([], zeroStats, true);
+      expect(text).not.toContain('structurally identical');
+      expect(text).not.toContain('identical');
+      expect(text).toContain('Comparison was capped at difference limit');
+      expect(text).toContain('Differences may remain undisplayed');
+    });
+
+    it('retains identical-documents message when diffs is empty and truncated is false', () => {
+      const zeroStats = { added: 0, removed: 0, modified: 0, total: 0 };
+      const text = formatDiffAsText([], zeroStats, false);
+      expect(text).toContain('Documents are structurally identical (0 differences found).');
+    });
+
+    it('produces accurate plain-text export for maxDiffs: 0 with different JSON', () => {
+      const result = compareJsonStrings('{"a": 1}', '{"a": 2}', { maxDiffs: 0 });
+      expect(result.diffs).toHaveLength(0);
+      expect(result.truncated).toBe(true);
+      expect(result.isIdentical).toBe(false);
+
+      const text = formatDiffAsText(result.diffs, result.stats, result.truncated);
+      expect(text).not.toContain('structurally identical');
+      expect(text).not.toContain('identical');
+      expect(text).toContain('Comparison was capped at difference limit');
+      expect(text).toContain('Differences may remain undisplayed');
+    });
+
+    it('continues reporting truncated: true in JSON export for maxDiffs: 0 with different JSON', () => {
+      const result = compareJsonStrings('{"a": 1}', '{"a": 2}', { maxDiffs: 0 });
+      const jsonStr = formatDiffAsJson(result.diffs, result.stats, result.truncated);
+      const parsed = JSON.parse(jsonStr);
+
+      expect(parsed.totalDifferences).toBe(0);
+      expect(parsed.truncated).toBe(true);
+      expect(parsed.differences).toEqual([]);
+      expect(parsed.summary).toEqual({ added: 0, removed: 0, modified: 0, total: 0 });
     });
   });
 
@@ -637,6 +692,52 @@ describe('jsonDiffUtils Unit Tests', () => {
         const resNaN = computeJsonDiff(left, right, { maxDiffs: NaN });
         expect(resNaN.diffs).toHaveLength(3);
         expect(resNaN.truncated).toBe(false);
+      });
+    });
+
+    describe('maxDepth Boundary and Fast-Path Evaluation', () => {
+      it('evaluates type mismatch at maxDepth boundary without deep traversal', () => {
+        const left = { a: { b: { c: { val: 1 } } } };
+        const right = { a: { b: { c: 'primitive-string' } } };
+        const res = computeJsonDiff(left, right, { maxDepth: 2 });
+        expect(res.diffs).toHaveLength(1);
+        expect(res.diffs[0].path).toBe('$.a.b');
+        expect(res.diffs[0].type).toBe('modified');
+      });
+
+      it('evaluates primitive inequality at maxDepth boundary without deep traversal', () => {
+        const left = { a: { b: 100 } };
+        const right = { a: { b: 200 } };
+        const res = computeJsonDiff(left, right, { maxDepth: 1 });
+        expect(res.diffs).toHaveLength(1);
+        expect(res.diffs[0].path).toBe('$.a');
+        expect(res.diffs[0].type).toBe('modified');
+      });
+
+      it('evaluates array length mismatch at maxDepth boundary without deep traversal', () => {
+        const left = { a: { items: [1, 2, 3] } };
+        const right = { a: { items: [1, 2] } };
+        const res = computeJsonDiff(left, right, { maxDepth: 1 });
+        expect(res.diffs).toHaveLength(1);
+        expect(res.diffs[0].path).toBe('$.a');
+        expect(res.diffs[0].type).toBe('modified');
+      });
+
+      it('evaluates object key count mismatch at maxDepth boundary without deep traversal', () => {
+        const left = { a: { conf: { x: 1, y: 2 } } };
+        const right = { a: { conf: { x: 1 } } };
+        const res = computeJsonDiff(left, right, { maxDepth: 1 });
+        expect(res.diffs).toHaveLength(1);
+        expect(res.diffs[0].path).toBe('$.a');
+        expect(res.diffs[0].type).toBe('modified');
+      });
+
+      it('correctly reports no differences when subtrees at maxDepth are structurally identical', () => {
+        const left = { a: { b: { c: { d: [1, 2, { deep: true }] } } } };
+        const right = { a: { b: { c: { d: [1, 2, { deep: true }] } } } };
+        const res = computeJsonDiff(left, right, { maxDepth: 2 });
+        expect(res.diffs).toHaveLength(0);
+        expect(res.truncated).toBe(false);
       });
     });
   });

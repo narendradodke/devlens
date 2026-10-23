@@ -285,5 +285,58 @@ describe('jwtUtils Unit Tests', () => {
         'Invalid Base64URL encoding in signature: contains illegal characters outside the Base64URL alphabet.'
       );
     });
+
+    it('accepts tokens with an empty signature segment (e.g. unsecured tokens)', () => {
+      const header = toBase64Url({ alg: 'none', typ: 'JWT' });
+      const payload = toBase64Url({ sub: 'unsecured' });
+      const token = `${header}.${payload}.`;
+
+      const result = parseJwt(token);
+      expect(result.valid).toBe(true);
+      expect(result.signature).toBe('');
+      expect(result.claims.sub).toBe('unsecured');
+    });
+
+    it('throws error when token exceeds MAX_JWT_LENGTH', () => {
+      const oversizedToken = 'a'.repeat(32769);
+      expect(() => parseJwt(oversizedToken)).toThrow(
+        /Token exceeds maximum supported size of 32 KB/
+      );
+    });
+
+    it('handles unusual numeric and non-numeric claims predictably', () => {
+      const header = toBase64Url({ alg: 'HS256' });
+      // Non-finite, NaN, and string claims for exp/iat/nbf
+      const payload = toBase64Url({
+        exp: 'not-a-number',
+        iat: NaN,
+        nbf: Infinity,
+      });
+      const token = `${header}.${payload}.sig`;
+
+      const result = parseJwt(token);
+      expect(result.claims.exp).toBeUndefined();
+      expect(result.claims.iat).toBeUndefined();
+      expect(result.claims.nbf).toBeUndefined();
+    });
+
+    it('accurately evaluates exact expiration boundaries', () => {
+      const header = toBase64Url({ alg: 'HS256' });
+      const expSec = 1700000000;
+      const payload = toBase64Url({ exp: expSec });
+      const token = `${header}.${payload}.sig`;
+
+      // 1 ms before expiration -> not expired
+      const beforeRes = parseJwt(token, expSec * 1000 - 1);
+      expect(beforeRes.claims.exp?.isExpired).toBe(false);
+
+      // Exact millisecond of expiration -> expired
+      const exactRes = parseJwt(token, expSec * 1000);
+      expect(exactRes.claims.exp?.isExpired).toBe(true);
+
+      // 1 ms after expiration -> expired
+      const afterRes = parseJwt(token, expSec * 1000 + 1);
+      expect(afterRes.claims.exp?.isExpired).toBe(true);
+    });
   });
 });

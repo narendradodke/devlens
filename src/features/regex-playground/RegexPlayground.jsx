@@ -9,16 +9,22 @@ import {
   FileText,
   Shield,
   Layers,
+  Loader2,
 } from 'lucide-react';
 import {
   SUPPORTED_FLAGS,
   SAMPLE_REGEX,
+  DEFAULT_MAX_MATCHES,
+  MAX_PATTERN_LENGTH,
+  MAX_TEXT_LENGTH,
+  DEFAULT_REGEX_TIMEOUT_MS,
   sanitizeFlags,
-  findMatches,
+  compileRegex,
   getHighlightSegments,
   formatMatchesAsText,
   formatMatchesAsJson,
 } from '../../lib/regexUtils';
+import { createRegexWorker } from '../../lib/regexWorkerService';
 
 export function RegexPlayground() {
   const [pattern, setPattern] = useState('');
@@ -29,21 +35,205 @@ export function RegexPlayground() {
   const [copiedSection, setCopiedSection] = useState(null); // 'pattern' | 'matches'
   const [copyError, setCopyError] = useState(null);
 
+  const [matchState, setMatchState] = useState({
+    matches: [],
+    error: null,
+    truncated: false,
+    isEmpty: true,
+  });
+  const [isEvaluating, setIsEvaluating] = useState(false);
+
+  const activeWorkerRef = useRef(null);
+  const timeoutRef = useRef(null);
+  const requestIdRef = useRef(0);
   const copiedTimeoutRef = useRef(null);
 
-  // Clean up timer on unmount
+  // Clean up timers and workers on unmount
   useEffect(() => {
     return () => {
+      if (activeWorkerRef.current) {
+        activeWorkerRef.current.terminate();
+        activeWorkerRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
       if (copiedTimeoutRef.current) {
         clearTimeout(copiedTimeoutRef.current);
       }
     };
   }, []);
 
-  // Live match derivation
-  const { matches, error, truncated } = useMemo(() => {
-    return findMatches(pattern, flags, testText);
+  // Live match evaluation via Web Worker with ReDoS timeout protection
+  useEffect(() => {
+    // Terminate any in-flight worker and timer
+    if (activeWorkerRef.current) {
+      activeWorkerRef.current.terminate();
+      activeWorkerRef.current = null;
+    }
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+      timeoutRef.current = null;
+    }
+
+    if (
+      !pattern ||
+      typeof pattern !== 'string' ||
+      pattern.trim() === '' ||
+      typeof testText !== 'string' ||
+      testText === ''
+    ) {
+      setMatchState({ matches: [], error: null, truncated: false, isEmpty: true });
+      setIsEvaluating(false);
+      return;
+    }
+
+    if (pattern.length > MAX_PATTERN_LENGTH) {
+      setMatchState({
+        matches: [],
+        error: `Pattern exceeds maximum allowed length of ${MAX_PATTERN_LENGTH.toLocaleString()} characters.`,
+        truncated: false,
+        isEmpty: false,
+      });
+      setIsEvaluating(false);
+      return;
+    }
+
+    if (testText.length > MAX_TEXT_LENGTH) {
+      setMatchState({
+        matches: [],
+        error: `Test text exceeds maximum allowed length of ${MAX_TEXT_LENGTH.toLocaleString()} characters.`,
+        truncated: false,
+        isEmpty: false,
+      });
+      setIsEvaluating(false);
+      return;
+    }
+
+    const { error: syntaxError } = compileRegex(pattern, flags);
+    if (syntaxError) {
+      setMatchState({ matches: [], error: syntaxError, truncated: false, isEmpty: false });
+      setIsEvaluating(false);
+      return;
+    }
+
+    const reqId = ++requestIdRef.current;
+    setIsEvaluating(true);
+
+    let worker = null;
+    try {
+      worker = createRegexWorker();
+    } catch {
+      worker = null;
+    }
+
+    if (!worker) {
+      setIsEvaluating(false);
+      setMatchState({
+        matches: [],
+        error:
+          'Web Workers are unavailable or failed to initialize. Untrusted regular expressions cannot be safely evaluated without background worker isolation.',
+        truncated: false,
+        isEmpty: false,
+      });
+      return;
+    }
+
+    activeWorkerRef.current = worker;
+
+    timeoutRef.current = setTimeout(() => {
+      if (activeWorkerRef.current === worker) {
+        worker.terminate();
+        activeWorkerRef.current = null;
+        if (requestIdRef.current === reqId) {
+          setIsEvaluating(false);
+          setMatchState({
+            matches: [],
+            error: `Regex execution timed out (${DEFAULT_REGEX_TIMEOUT_MS}ms limit exceeded). The pattern may be experiencing catastrophic backtracking (ReDoS).`,
+            truncated: false,
+            isEmpty: false,
+          });
+        }
+      }
+    }, DEFAULT_REGEX_TIMEOUT_MS);
+
+    worker.onmessage = (event) => {
+      if (requestIdRef.current !== reqId) return;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      worker.terminate();
+      activeWorkerRef.current = null;
+      setIsEvaluating(false);
+
+      if (!event || !event.data || typeof event.data !== 'object') {
+        setMatchState({
+          matches: [],
+          error: 'Worker returned a malformed response.',
+          truncated: false,
+          isEmpty: false,
+        });
+        return;
+      }
+
+      const { success, result, error: workerErr } = event.data;
+      if (!success || !result) {
+        setMatchState({
+          matches: [],
+          error: workerErr || 'Worker execution error during regex evaluation.',
+          truncated: false,
+          isEmpty: false,
+        });
+      } else {
+        setMatchState({
+          matches: Array.isArray(result.matches) ? result.matches : [],
+          error: result.error || null,
+          truncated: Boolean(result.truncated),
+          isEmpty: Boolean(result.isEmpty),
+        });
+      }
+    };
+
+    worker.onerror = (event) => {
+      if (requestIdRef.current !== reqId) return;
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      worker.terminate();
+      activeWorkerRef.current = null;
+      setIsEvaluating(false);
+      setMatchState({
+        matches: [],
+        error: event.message || 'Worker encountered an unexpected error.',
+        truncated: false,
+        isEmpty: false,
+      });
+    };
+
+    worker.postMessage({
+      id: reqId,
+      pattern,
+      flags,
+      text: testText,
+      maxMatches: DEFAULT_MAX_MATCHES,
+    });
+
+    return () => {
+      if (activeWorkerRef.current) {
+        activeWorkerRef.current.terminate();
+        activeWorkerRef.current = null;
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+    };
   }, [pattern, flags, testText]);
+
+  const { matches, error, truncated } = matchState;
 
   // Derived highlighted text segments
   const highlightSegments = useMemo(() => {
@@ -292,8 +482,16 @@ export function RegexPlayground() {
               <span>Match Results</span>
             </span>
 
-            {/* Match Counter Badge */}
-            {pattern && testText && !error ? (
+            {/* Evaluating spinner or Match Counter Badge */}
+            {isEvaluating ? (
+              <span
+                role="status"
+                className="text-xs font-semibold px-2.5 py-0.5 rounded-full border bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/80 dark:text-blue-300 dark:border-blue-800 flex items-center gap-1"
+              >
+                <Loader2 className="w-3 h-3 animate-spin" />
+                <span>Evaluating...</span>
+              </span>
+            ) : pattern && testText && !error ? (
               <span
                 role="status"
                 className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${
@@ -534,15 +732,16 @@ export function RegexPlayground() {
           <span>Privacy & Engine Performance Notice</span>
         </div>
         <p className="leading-relaxed">
-          Regular expressions execute entirely in your local browser tab using native JavaScript
-          RegExp with zero server calls. Notice: The 5,000-match display ceiling guards against UI
-          memory exhaustion, but does <em>not</em> prevent catastrophic backtracking (ReDoS).
-          Exponential patterns (such as nested quantifiers like{' '}
+          Regular expressions execute entirely in your local browser using a dedicated Web Worker
+          with zero server calls. Notice: The 5,000-match display ceiling guards against UI memory
+          exhaustion, but match caps alone do <em>not</em> prevent catastrophic backtracking
+          (ReDoS). To protect against UI freezes from exponential patterns (such as nested
+          quantifiers like{' '}
           <code className="font-mono text-[11px] bg-slate-200 dark:bg-slate-800 px-1 py-0.5 rounded">
             (a+)+$
           </code>
-          ) run synchronously and can freeze the browser tab. Avoid testing unconstrained
-          exponential expressions on large inputs.
+          ), evaluation runs in an isolated background worker with an automatic 2,000ms termination
+          timeout.
         </p>
       </div>
     </div>

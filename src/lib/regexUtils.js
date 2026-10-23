@@ -84,9 +84,47 @@ export function compileRegex(pattern, flags = '') {
 }
 
 /**
+ * Default limits and bounds for regex matching operations.
+ */
+export const DEFAULT_MAX_MATCHES = 5000;
+export const UPPER_MAX_MATCHES = 50000;
+export const MAX_PATTERN_LENGTH = 5000;
+export const MAX_TEXT_LENGTH = 1000000;
+export const DEFAULT_REGEX_TIMEOUT_MS = 2000;
+
+/**
+ * Safely normalizes maxMatches option to a finite non-negative integer.
+ *
+ * @param {unknown} value
+ * @param {number} [defaultValue=5000]
+ * @param {number} [maxBound=50000]
+ * @returns {number}
+ */
+export function normalizeMaxMatches(
+  value,
+  defaultValue = DEFAULT_MAX_MATCHES,
+  maxBound = UPPER_MAX_MATCHES
+) {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return defaultValue;
+  }
+  if (!Number.isFinite(value)) {
+    return value > 0 ? maxBound : 0;
+  }
+  const intVal = Math.floor(value);
+  return Math.max(0, Math.min(intVal, maxBound));
+}
+
+/**
  * Finds all matches of a regex in the given test text.
  * Safely guards against infinite loops caused by zero-length matches and
  * accurately detects if additional matches exist beyond maxMatches.
+ *
+ * Security notice on ReDoS:
+ * The maxMatches ceiling limits array allocations and memory usage for runaway match
+ * counts, but does NOT prevent regular expression denial of service (ReDoS / catastrophic
+ * backtracking) during regex engine execution. ReDoS protection must be handled via
+ * execution time bounds and Web Worker isolation.
  *
  * @param {string} pattern
  * @param {string} flags
@@ -106,9 +144,27 @@ export function compileRegex(pattern, flags = '') {
  *   truncated: boolean,
  * }}
  */
-export function findMatches(pattern, flags, text, maxMatches = 5000) {
+export function findMatches(pattern, flags, text, maxMatches = DEFAULT_MAX_MATCHES) {
   if (typeof pattern !== 'string' || pattern.trim() === '' || typeof text !== 'string') {
     return { matches: [], error: null, isEmpty: true, truncated: false };
+  }
+
+  if (pattern.length > MAX_PATTERN_LENGTH) {
+    return {
+      matches: [],
+      error: `Pattern exceeds maximum allowed length of ${MAX_PATTERN_LENGTH.toLocaleString()} characters.`,
+      isEmpty: false,
+      truncated: false,
+    };
+  }
+
+  if (text.length > MAX_TEXT_LENGTH) {
+    return {
+      matches: [],
+      error: `Test text exceeds maximum allowed length of ${MAX_TEXT_LENGTH.toLocaleString()} characters.`,
+      isEmpty: false,
+      truncated: false,
+    };
   }
 
   const { regex, error } = compileRegex(pattern, flags);
@@ -116,11 +172,17 @@ export function findMatches(pattern, flags, text, maxMatches = 5000) {
     return { matches: [], error, isEmpty: false, truncated: false };
   }
 
+  const safeMaxMatches = normalizeMaxMatches(maxMatches, DEFAULT_MAX_MATCHES, UPPER_MAX_MATCHES);
   const matches = [];
   const isGlobal = regex.global;
 
   if (!isGlobal) {
     // Non-global regex: executes once
+    if (safeMaxMatches === 0) {
+      const peek = regex.exec(text);
+      return { matches: [], error: null, isEmpty: peek === null, truncated: peek !== null };
+    }
+
     const singleMatch = regex.exec(text);
     if (singleMatch) {
       matches.push({
@@ -133,6 +195,13 @@ export function findMatches(pattern, flags, text, maxMatches = 5000) {
       });
     }
     return { matches, error: null, isEmpty: matches.length === 0, truncated: false };
+  }
+
+  // Global regex with maxMatches = 0: peek whether at least one match exists
+  if (safeMaxMatches === 0) {
+    regex.lastIndex = 0;
+    const peek = regex.exec(text);
+    return { matches: [], error: null, isEmpty: peek === null, truncated: peek !== null };
   }
 
   // Global regex: execute iteratively with zero-length loop prevention
@@ -171,7 +240,7 @@ export function findMatches(pattern, flags, text, maxMatches = 5000) {
       }
     }
 
-    if (matches.length >= maxMatches) {
+    if (matches.length >= safeMaxMatches) {
       // Accurately verify whether an additional match actually exists beyond maxMatches without an unbounded loop
       if (regex.lastIndex <= text.length) {
         const peekNext = regex.exec(text);

@@ -16,18 +16,17 @@ DevLens is engineered as a client-side single-page application prioritizing priv
 
 - **No Backend Server**: There is no server-side runtime, Express, Python, or Go service.
 - **Zero Telemetry**: No Google Analytics, Mixpanel, tracking pixels, or third-party cookies.
-- **Local Volatile Processing**: Sensitive inputs (JSON payloads, tokens, credentials, regex targets) never leave your browser tab and are not covertly persisted.
+- **Local Volatile Processing**: Sensitive inputs (JSON payloads, tokens, credentials, regex targets) never leave your browser tab and are processed in-memory.
+- **Opt-In Persistence Disclosure**: All tools operate ephemerally by default. The Recipe Manager offers an explicit, opt-in "Save on this device" setting stored as unencrypted plaintext in `localStorage`, accompanied by security warnings never to store credentials.
 - **Safe DOM Rendering**: Outputs are rendered exclusively through safe React elements and text nodes (no `eval()` or `dangerouslySetInnerHTML`).
 - **Signature Disclaimer**: JWT decoding is performed purely on the client side to inspect encoded claims. It does **not** cryptographically verify signatures or prove token authenticity.
-- **Planned Isolated Execution**: Resource-intensive tasks (such as planned regex matching) will run inside dedicated Web Workers with timeouts to protect your main UI thread.
+- **Isolated Regex Worker**: Untrusted regular expression evaluation executes inside an isolated background Web Worker with a strict 2,000ms timeout to protect the main UI thread. If Web Worker creation fails or is blocked by browser policy, evaluation halts safely with an error rather than falling back to unsafe synchronous main-thread execution.
 
 ---
 
-## 🛠️ Tool Status & Roadmap
+## 🛠️ Implemented Tools
 
-DevLens is built phase-by-phase with honest verification before proceeding to subsequent modules:
-
-### 🟢 Implemented & Active Tools
+All six core tools in the DevLens suite are fully implemented, verified, and active:
 
 1. **JSON Studio** (`/json-studio`)
    - **Pretty-Printing**: Formats raw JSON with standard 2-space indentation.
@@ -47,33 +46,45 @@ DevLens is built phase-by-phase with honest verification before proceeding to su
    - **Volatile Execution**: Never persists tokens in `localStorage`, cookies, or session storage, and never transmits tokens over the network.
 
 3. **Regex Playground** (`/regex-playground`)
-   - **Real-Time Match Highlighting**: Safely highlights regex matches directly using standard React elements without `dangerouslySetInnerHTML`.
+   - **Web Worker Isolation**: Regular expression matching runs in a dedicated background Web Worker to protect the main UI thread.
+   - **Strict Execution Timeout**: Background evaluations are capped at a 2,000ms timeout. If a pattern causes catastrophic backtracking, the worker is forcefully terminated (`worker.terminate()`) with an informative ReDoS notice.
+   - **No Unsafe Fallback**: If Web Workers fail to instantiate or are blocked by browser security policies, synchronous execution on the main thread is strictly prevented to avoid freezing the browser tab.
+   - **Real-Time Match Highlighting**: Highlights regex matches using standard React text spans without `dangerouslySetInnerHTML`.
    - **Flag Controls**: Accessible toggle buttons for standard JavaScript regex flags (`g`, `i`, `m`, `s`, `u`).
    - **Match Details Inspector**: Reports match text, character index ranges (`start..end`), match lengths, and captured group hierarchies (including named groups).
-   - **Zero-Length Match Safety**: Guards against infinite loops when evaluating patterns that match empty strings (e.g., `^`, `$`, `\b`, `a*`) with Unicode surrogate-pair preservation.
-   - **Safe Match Capping**: Protects UI memory with a 5,000-match display ceiling with accurate excess detection and export indicators.
-   - **Actions & Export**: Pre-configured email extraction sample, copy pattern (`/pattern/flags`), and copy matches formatted as plain text or JSON.
-   - **Performance Notice**: Regular expressions execute synchronously on the browser thread. While output is capped to avoid memory exhaustion, complex exponential backtracking patterns (ReDoS) can freeze the UI tab.
+   - **Zero-Length Match Safety**: Handles zero-length match progression accurately with Unicode code point awareness when the `u` flag is enabled.
+   - **Safe Match & Input Limits**: Protects memory with a 5,000-character pattern limit, 1,000,000-character test text limit, and 5,000-match display ceiling with excess indicators.
 
 4. **JSON Diff** (`/json-diff`)
    - **Dual Editor Interface**: Independent side-by-side JSON text inputs with character, line, and byte size indicators.
    - **Structural Normalization**: Whitespace, formatting, indentation, and object property key ordering are normalized (0 differences reported for semantically identical JSON).
    - **Deep Traversal**: Traverses nested objects and arrays to detect Added, Removed, and Modified values with complete JSONPath notation (`$.path.to.key`).
+   - **Iterative Stack-Safe Traversal**: Prevents call-stack overflow on deeply nested JSON subtrees.
    - **Index-Aware Array Comparison**: Compares array elements positionally and reports length discrepancies accurately.
    - **Interactive Filtering & Search**: Filter diff records by type (`Added`, `Removed`, `Modified`) and search by JSONPath or value text.
-   - **Export Options**: Copy diffs formatted as plain text or structured JSON with clipboard permission handling.
-   - **100% In-Browser Execution**: All diffing executes locally in browser memory without sending data to servers.
+   - **Export Options**: Copy diffs formatted as plain text or structured JSON with accurate truncation reporting.
+   - **Size Guard**: Enforces a 5,000,000-character input limit before trimming or parsing to protect heap allocation.
 
-### 🟡 Planned Tools (Scheduled for Remaining Phase 2 & 3)
+5. **Encode / Decode Lab** (`/encode-decode`)
+   - **6 Encoding Schemes**:
+     - **Standard Base64 (RFC 4648 §4)**: Full Unicode UTF-8 byte support with padding and character alphabet validation.
+     - **URL-Safe Base64URL (RFC 4648 §5)**: Translates `+`/`/` to `-`/`_` and handles unpadded or padded input.
+     - **URL Component**: Percent-encodes reserved query and path delimiters via `encodeURIComponent` / `decodeURIComponent` with malformed percent-sequence diagnostics.
+     - **Full URL**: Preserves protocol and hierarchical URI delimiters (`://`, `?`, `&`, `#`, `/`) via `encodeURI` / `decodeURI`.
+     - **HTML Entities**: Deterministic encoding of `&`, `<`, `>`, `"`, `'` and safe decoding of named, decimal (`&#65;`), and hex (`&#x1F680;`) entities without DOM injection.
+     - **Hexadecimal UTF-8 Bytes**: Encodes text to space-separated hex bytes; decodes space, comma, colon, continuous, or `0x`-prefixed hex strings with even-length validation.
+   - **Instant Swap Action**: Swaps input and output while simultaneously reversing direction (Encode ⇄ Decode) for instant roundtrip verification.
+   - **Security Disclaimer**: Persistent banner reminding users that encoding is not encryption.
+   - **Size Guard**: Rejects inputs exceeding 1,000,000 characters (1 MB) before processing.
 
-5. **Encode / Decode Lab** (`/encode-decode`) — _Phase 2 Target_
-   - Component-level URL encoding and decoding (`encodeURIComponent`).
-   - Unicode-safe UTF-8 Base64 encoding and decoding.
-   - Clear diagnostic feedback for malformed padding or invalid characters.
-
-6. **Recipe Manager** (`/recipes`) — _Phase 3 Target_
-   - Save, view, and reuse allowlisted tool configurations.
-   - Strict 1 MB file size enforcement and schema validation on JSON import/export.
+6. **Recipe Manager** (`/recipes`)
+   - **Master-Detail Workspace**: Searchable, categorizable library of reusable developer commands, configurations, and reference templates.
+   - **6 Curated Starter Presets**: Real-world templates for cURL with Bearer authentication, Docker Compose PostgreSQL with healthcheck, Git branch pruning, strict CSP headers, Nginx TLS reverse proxy, and PostgreSQL idle connection termination.
+   - **Immutable Presets**: Starter recipes use parameter placeholders (`<YOUR_API_TOKEN>`, `<PORT>`) and cannot be deleted; clicking **Duplicate** clones presets into editable custom recipes.
+   - **Caution & Security Labels**: Destructive commands and security-sensitive configurations are prominently highlighted with caution badges.
+   - **Full Custom CRUD**: Create, edit, and delete custom recipes with syntax formats (`bash`, `json`, `yaml`, `sql`, `regex`, `text`), categories, descriptions, and tags.
+   - **Opt-In Device Persistence**: "Save on this device" checkbox saves custom recipes to `localStorage` as unencrypted plaintext, accompanied by clear warnings never to store credentials. Includes a "Clear Saved Recipes" purge button.
+   - **Versioned JSON Import & Export**: Exports custom recipes to `.json` files; imports recipes with strict 1 MB file size verification, atomic dataset validation, and non-destructive ID collision handling.
 
 ---
 

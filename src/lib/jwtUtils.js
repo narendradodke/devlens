@@ -8,6 +8,12 @@
 const BASE64_URL_REGEX = /^[A-Za-z0-9_-]*$/;
 
 /**
+ * Maximum supported token length for JWT Inspector (32 KB / 32,768 characters).
+ * Protects memory allocation and parsing against oversized payloads.
+ */
+export const MAX_JWT_LENGTH = 32768;
+
+/**
  * Decode a Base64URL string segment into a UTF-8 string and parse as JSON object.
  *
  * @param {string} segment - Base64URL-encoded segment
@@ -90,7 +96,7 @@ export function decodeBase64UrlSegment(segment, segmentName = 'segment') {
  * @returns {{ dateString: string, isoString: string, timestamp: number } | null}
  */
 export function formatTimestampClaim(timestamp) {
-  if (typeof timestamp !== 'number' || isNaN(timestamp) || !isFinite(timestamp)) {
+  if (typeof timestamp !== 'number' || !Number.isFinite(timestamp)) {
     return null;
   }
 
@@ -136,6 +142,12 @@ export function parseJwt(token, now = Date.now()) {
     throw new Error('Token input cannot be empty. Please provide a valid compact JWT.');
   }
 
+  if (token.length > MAX_JWT_LENGTH) {
+    throw new Error(
+      `Token exceeds maximum supported size of 32 KB (${MAX_JWT_LENGTH.toLocaleString()} characters).`
+    );
+  }
+
   const trimmed = token.trim();
   const segments = trimmed.split('.');
 
@@ -170,7 +182,7 @@ export function parseJwt(token, now = Date.now()) {
   if (payload.jti !== undefined) claims.jti = String(payload.jti);
 
   // Handle exp claim
-  if (typeof payload.exp === 'number') {
+  if (typeof payload.exp === 'number' && Number.isFinite(payload.exp)) {
     const formatted = formatTimestampClaim(payload.exp);
     if (formatted) {
       claims.exp = {
@@ -181,7 +193,7 @@ export function parseJwt(token, now = Date.now()) {
   }
 
   // Handle iat claim
-  if (typeof payload.iat === 'number') {
+  if (typeof payload.iat === 'number' && Number.isFinite(payload.iat)) {
     const formatted = formatTimestampClaim(payload.iat);
     if (formatted) {
       claims.iat = formatted;
@@ -189,7 +201,7 @@ export function parseJwt(token, now = Date.now()) {
   }
 
   // Handle nbf claim
-  if (typeof payload.nbf === 'number') {
+  if (typeof payload.nbf === 'number' && Number.isFinite(payload.nbf)) {
     const formatted = formatTimestampClaim(payload.nbf);
     if (formatted) {
       claims.nbf = {

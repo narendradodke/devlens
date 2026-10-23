@@ -4,15 +4,32 @@
  */
 
 /**
+ * Maximum supported input size for browser JSON operations (5 MB / 5,000,000 characters).
+ * Protects memory allocation and UI responsiveness against runaway inputs.
+ */
+export const MAX_JSON_INPUT_LENGTH = 5000000;
+
+/**
  * Format raw JSON text with standard indentation.
  * Throws a SyntaxError if the input is not valid JSON.
+ * Throws a RangeError if the input exceeds the maximum supported size.
  *
  * @param {string} input - Raw JSON string
  * @param {number} [indent=2] - Indentation spaces
  * @returns {string} Formatted JSON string
  */
 export function formatJson(input, indent = 2) {
-  if (typeof input !== 'string' || input.trim() === '') {
+  if (typeof input !== 'string') {
+    throw new SyntaxError('Input cannot be empty. Please provide a valid JSON string.');
+  }
+
+  if (input.length > MAX_JSON_INPUT_LENGTH) {
+    throw new RangeError(
+      `Input exceeds maximum supported size of 5 MB (${MAX_JSON_INPUT_LENGTH.toLocaleString()} characters).`
+    );
+  }
+
+  if (input.trim() === '') {
     throw new SyntaxError('Input cannot be empty. Please provide a valid JSON string.');
   }
 
@@ -23,12 +40,23 @@ export function formatJson(input, indent = 2) {
 /**
  * Minify raw JSON text into a compact single-line string.
  * Throws a SyntaxError if the input is not valid JSON.
+ * Throws a RangeError if the input exceeds the maximum supported size.
  *
  * @param {string} input - Raw JSON string
  * @returns {string} Minified single-line JSON string
  */
 export function minifyJson(input) {
-  if (typeof input !== 'string' || input.trim() === '') {
+  if (typeof input !== 'string') {
+    throw new SyntaxError('Input cannot be empty. Please provide a valid JSON string.');
+  }
+
+  if (input.length > MAX_JSON_INPUT_LENGTH) {
+    throw new RangeError(
+      `Input exceeds maximum supported size of 5 MB (${MAX_JSON_INPUT_LENGTH.toLocaleString()} characters).`
+    );
+  }
+
+  if (input.trim() === '') {
     throw new SyntaxError('Input cannot be empty. Please provide a valid JSON string.');
   }
 
@@ -44,7 +72,25 @@ export function minifyJson(input) {
  * @returns {{ isValid: boolean, error: string | null, type?: string | null, details?: string | null, message?: string }}
  */
 export function validateJson(input) {
-  if (typeof input !== 'string' || input.trim() === '') {
+  if (typeof input !== 'string') {
+    return {
+      isValid: false,
+      error: 'Input cannot be empty. Please provide a valid JSON string.',
+      type: null,
+      details: null,
+    };
+  }
+
+  if (input.length > MAX_JSON_INPUT_LENGTH) {
+    return {
+      isValid: false,
+      error: `Input exceeds maximum supported size of 5 MB (${MAX_JSON_INPUT_LENGTH.toLocaleString()} characters).`,
+      type: null,
+      details: null,
+    };
+  }
+
+  if (input.trim() === '') {
     return {
       isValid: false,
       error: 'Input cannot be empty. Please provide a valid JSON string.',

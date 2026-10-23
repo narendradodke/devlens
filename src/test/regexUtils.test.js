@@ -3,6 +3,11 @@ import {
   sanitizeFlags,
   compileRegex,
   findMatches,
+  normalizeMaxMatches,
+  DEFAULT_MAX_MATCHES,
+  UPPER_MAX_MATCHES,
+  MAX_PATTERN_LENGTH,
+  MAX_TEXT_LENGTH,
   getHighlightSegments,
   formatMatchesAsText,
   formatMatchesAsJson,
@@ -479,6 +484,48 @@ describe('regexUtils Unit Tests', () => {
       const jsonStr = formatMatchesAsJson(sampleMatches, '[A-Z]+', 'gi', true);
       const parsed = JSON.parse(jsonStr);
       expect(parsed.truncated).toBe(true);
+    });
+  });
+
+  describe('normalizeMaxMatches & Input Limits', () => {
+    it('normalizes maxMatches across unexpected, decimal, and boundary values', () => {
+      expect(normalizeMaxMatches(undefined)).toBe(DEFAULT_MAX_MATCHES);
+      expect(normalizeMaxMatches(NaN)).toBe(DEFAULT_MAX_MATCHES);
+      expect(normalizeMaxMatches('invalid')).toBe(DEFAULT_MAX_MATCHES);
+      expect(normalizeMaxMatches(-100)).toBe(0);
+      expect(normalizeMaxMatches(0)).toBe(0);
+      expect(normalizeMaxMatches(3.8)).toBe(3);
+      expect(normalizeMaxMatches(Infinity)).toBe(UPPER_MAX_MATCHES);
+      expect(normalizeMaxMatches(-Infinity)).toBe(0);
+      expect(normalizeMaxMatches(200)).toBe(200);
+    });
+
+    it('rejects oversized pattern exceeding MAX_PATTERN_LENGTH', () => {
+      const longPattern = 'a'.repeat(MAX_PATTERN_LENGTH + 1);
+      const result = findMatches(longPattern, 'g', 'test');
+      expect(result.matches).toHaveLength(0);
+      expect(result.error).toContain('Pattern exceeds maximum allowed length');
+    });
+
+    it('rejects oversized text exceeding MAX_TEXT_LENGTH', () => {
+      const longText = 'a'.repeat(MAX_TEXT_LENGTH + 1);
+      const result = findMatches('a', 'g', longText);
+      expect(result.matches).toHaveLength(0);
+      expect(result.error).toContain('Test text exceeds maximum allowed length');
+    });
+
+    it('handles maxMatches: 0 safely for global and non-global regexes', () => {
+      const globalRes = findMatches('a', 'g', 'aaa', 0);
+      expect(globalRes.matches).toHaveLength(0);
+      expect(globalRes.truncated).toBe(true);
+
+      const nonGlobalRes = findMatches('a', '', 'aaa', 0);
+      expect(nonGlobalRes.matches).toHaveLength(0);
+      expect(nonGlobalRes.truncated).toBe(true);
+
+      const noMatchRes = findMatches('z', 'g', 'aaa', 0);
+      expect(noMatchRes.matches).toHaveLength(0);
+      expect(noMatchRes.truncated).toBe(false);
     });
   });
 });

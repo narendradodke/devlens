@@ -92,6 +92,7 @@ export const DEFAULT_MAX_DIFFS = 5000;
 export const DEFAULT_MAX_DEPTH = 50;
 export const UPPER_MAX_DIFFS = 50000;
 export const UPPER_MAX_DEPTH = 1000;
+export const MAX_JSON_DIFF_INPUT_LENGTH = 5000000;
 
 /**
  * Safely normalizes maxDiffs option to a finite non-negative integer.
@@ -216,6 +217,25 @@ export function formatValueForDisplay(val) {
 /**
  * Traverses two JSON values and produces an array of structured DiffEntry records.
  *
+ * Behavioral notes on maxDepth:
+ * - maxDepth defines the maximum depth for reporting detailed, granular JSONPath diffs.
+ * - Once depth >= maxDepth, traversal halts granular child path exploration. If the
+ *   subtrees at the boundary are structurally unequal, a single 'modified' diff is
+ *   recorded at that boundary path rather than enumerating each nested change.
+ * - If subtrees at the boundary are identical, no diff is emitted.
+ * - Resource usage: Fast-path checks (type mismatch, primitive inequality, array length
+ *   mismatch, object key count mismatch) immediately record differences without traversing
+ *   subtrees. However, when types and sizes match, an iterative stack-safe deep equality
+ *   check (isDeepEqual) is executed to prevent false positives. Thus, maxDepth bounds
+ *   path granularity and call stack depth, but it does NOT strictly limit total CPU work,
+ *   as validating equality across large identical or near-identical subtrees still requires
+ *   traversing nodes.
+ *
+ * Behavioral notes on maxDiffs:
+ * - Limits the maximum number of recorded diff entries returned in the `diffs` array.
+ * - When differences exist beyond this limit, `truncated` is set to true.
+ * - A maxDiffs of 0 records 0 diffs, flagging `truncated: true` only if differences actually exist.
+ *
  * @param {unknown} left - Original parsed value
  * @param {unknown} right - Modified parsed value
  * @param {object} [options]
@@ -280,16 +300,35 @@ export function computeJsonDiff(left, right, options = {}) {
       return;
     }
 
+    const typeL = getJsonValueType(l);
+    const typeR = getJsonValueType(r);
+
     if (depth >= safeMaxDepth) {
-      // Exceeded depth ceiling: record modified difference without deeper traversal
+      // Exceeded depth ceiling: evaluate boundary node without deeper path expansion.
+      // Fast-path inequality checks avoid redundant subtree traversal:
+      if (typeL !== typeR) {
+        recordDifference(path, 'modified', l, r);
+        return;
+      }
+      if (typeL !== 'object' && typeL !== 'array') {
+        recordDifference(path, 'modified', l, r);
+        return;
+      }
+      if (typeL === 'array' && l.length !== r.length) {
+        recordDifference(path, 'modified', l, r);
+        return;
+      }
+      if (typeL === 'object' && Object.keys(l).length !== Object.keys(r).length) {
+        recordDifference(path, 'modified', l, r);
+        return;
+      }
+      // When types and lengths/key counts match, verify subtree equality to avoid false diffs.
+      // Note: isDeepEqual performs iterative traversal of the remaining subtree.
       if (!isDeepEqual(l, r)) {
         recordDifference(path, 'modified', l, r);
       }
       return;
     }
-
-    const typeL = getJsonValueType(l);
-    const typeR = getJsonValueType(r);
 
     // If types differ, mark modified directly
     if (typeL !== typeR) {
@@ -383,6 +422,30 @@ export function computeJsonDiff(left, right, options = {}) {
  * }}
  */
 export function compareJsonStrings(originalText, modifiedText, options = {}) {
+  // Guard against oversized inputs that risk memory exhaustion before trimming
+  if (typeof originalText === 'string' && originalText.length > MAX_JSON_DIFF_INPUT_LENGTH) {
+    return {
+      diffs: [],
+      isIdentical: false,
+      isEmpty: false,
+      truncated: false,
+      leftError: `Original JSON exceeds maximum supported size of 5 MB (${MAX_JSON_DIFF_INPUT_LENGTH.toLocaleString()} characters).`,
+      rightError: null,
+      stats: { added: 0, removed: 0, modified: 0, total: 0 },
+    };
+  }
+  if (typeof modifiedText === 'string' && modifiedText.length > MAX_JSON_DIFF_INPUT_LENGTH) {
+    return {
+      diffs: [],
+      isIdentical: false,
+      isEmpty: false,
+      truncated: false,
+      leftError: null,
+      rightError: `Modified JSON exceeds maximum supported size of 5 MB (${MAX_JSON_DIFF_INPUT_LENGTH.toLocaleString()} characters).`,
+      stats: { added: 0, removed: 0, modified: 0, total: 0 },
+    };
+  }
+
   const leftTrim = typeof originalText === 'string' ? originalText.trim() : '';
   const rightTrim = typeof modifiedText === 'string' ? modifiedText.trim() : '';
 
@@ -464,13 +527,16 @@ export function compareJsonStrings(originalText, modifiedText, options = {}) {
  */
 export function formatDiffAsText(diffs, stats, truncated = false) {
   if (!diffs || diffs.length === 0) {
+    if (truncated) {
+      return 'DevLens JSON Diff\nStatus: Comparison was capped at difference limit (0 differences displayed). Differences may remain undisplayed.\n';
+    }
     return 'DevLens JSON Diff\nStatus: Documents are structurally identical (0 differences found).\n';
   }
 
   const lines = [
     'DevLens JSON Diff Report',
-    `Total Differences: ${stats.total}${truncated ? ' (capped at limit)' : ''}`,
-    `Summary: ${stats.added} added (+), ${stats.removed} removed (-), ${stats.modified} modified (~)`,
+    `Total Differences: ${stats ? stats.total : diffs.length}${truncated ? ' (capped at limit)' : ''}`,
+    `Summary: ${stats ? stats.added : 0} added (+), ${stats ? stats.removed : 0} removed (-), ${stats ? stats.modified : 0} modified (~)`,
     '------------------------------------------------------------',
   ];
 
@@ -500,13 +566,19 @@ export function formatDiffAsText(diffs, stats, truncated = false) {
  * @returns {string}
  */
 export function formatDiffAsJson(diffs, stats, truncated = false) {
+  const safeStats = stats || {
+    added: 0,
+    removed: 0,
+    modified: 0,
+    total: diffs ? diffs.length : 0,
+  };
   return JSON.stringify(
     {
       tool: 'DevLens JSON Diff',
-      totalDifferences: stats.total,
-      summary: stats,
+      totalDifferences: safeStats.total,
+      summary: safeStats,
       truncated,
-      differences: diffs.map((d) => ({
+      differences: (diffs || []).map((d) => ({
         path: d.path,
         type: d.type,
         oldValue: d.oldValue,

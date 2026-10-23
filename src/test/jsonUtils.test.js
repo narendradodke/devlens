@@ -39,6 +39,12 @@ describe('jsonUtils unit tests', () => {
       expect(() => formatJson('')).toThrow(SyntaxError);
       expect(() => formatJson('   ')).toThrow(SyntaxError);
     });
+
+    it('throws RangeError when input exceeds MAX_JSON_INPUT_LENGTH', () => {
+      const oversized = '{"val": "' + 'x'.repeat(5000000) + '"}';
+      expect(() => formatJson(oversized)).toThrow(RangeError);
+      expect(() => formatJson(oversized)).toThrow(/Input exceeds maximum supported size/);
+    });
   });
 
   describe('minifyJson', () => {
@@ -62,6 +68,12 @@ describe('jsonUtils unit tests', () => {
     it('throws SyntaxError on invalid JSON', () => {
       expect(() => minifyJson('{unquotedKey: 123}')).toThrow(SyntaxError);
       expect(() => minifyJson('')).toThrow(SyntaxError);
+    });
+
+    it('throws RangeError when input exceeds MAX_JSON_INPUT_LENGTH', () => {
+      const oversized = '{"val": "' + 'x'.repeat(5000000) + '"}';
+      expect(() => minifyJson(oversized)).toThrow(RangeError);
+      expect(() => minifyJson(oversized)).toThrow(/Input exceeds maximum supported size/);
     });
   });
 
@@ -104,6 +116,13 @@ describe('jsonUtils unit tests', () => {
       const result = validateJson('');
       expect(result.isValid).toBe(false);
       expect(result.error).toContain('empty');
+    });
+
+    it('returns isValid false with error when input exceeds MAX_JSON_INPUT_LENGTH', () => {
+      const oversized = '{"val": "' + 'x'.repeat(5000000) + '"}';
+      const result = validateJson(oversized);
+      expect(result.isValid).toBe(false);
+      expect(result.error).toContain('Input exceeds maximum supported size');
     });
   });
 

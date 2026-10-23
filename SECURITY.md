@@ -2,13 +2,15 @@
 
 ## 🔒 Security & Privacy Model
 
-DevLens is designed from the ground up as a **privacy-first, client-only developer toolkit**. Our security architecture adheres to these principles:
+DevLens is designed from the ground up as a **privacy-first, client-only developer toolkit**. Our security architecture adheres to these core principles:
 
-1. **Zero External Data Transmission**: All utility processing (currently active JSON formatting, minification, and validation; and planned token decoding, regex evaluation, and string conversion) runs strictly in-memory inside your local browser tab. DevLens makes zero outbound network requests with user input.
-2. **Volatile Storage by Default**: No user-entered JSON payloads, keys, credentials, or tokens are saved to persistent browser storage (`localStorage` or `IndexedDB`) without explicit user action.
-3. **Safe DOM Rendering**: All dynamic outputs, syntax messages, and search queries are rendered using native text nodes and safe React elements. The use of `eval()`, `new Function()`, or `dangerouslySetInnerHTML` is strictly prohibited to prevent Cross-Site Scripting (XSS).
-4. **Execution Isolation (Planned)**: Resource-heavy operations (specifically the upcoming regular expression engine in Phase 2) will be isolated within Web Workers with execution timeouts to protect the main UI thread from Denial of Service (ReDoS).
-5. **No Cryptographic Guarantees for Decoding (Planned)**: Upcoming client-side decoding (such as JWT inspection in Phase 2) will explicitly warn users that decoding token structure does not establish cryptographic authenticity or signature validity.
+1. **Zero External Data Transmission**: All utility processing across all six tools (JSON Studio, JWT Inspector, Regex Playground, JSON Diff, Encode / Decode Lab, and Recipe Manager) runs strictly client-side inside your local browser tab. DevLens makes zero outbound network requests with user input, analytics, or telemetry.
+2. **Volatile Storage by Default**: No user-entered JSON payloads, JWTs, regex patterns, diff inputs, or encoded strings are saved to persistent browser storage (`localStorage` or `IndexedDB`). In Recipe Manager, saving custom recipes to local device storage is strictly opt-in (`localStorage`), unencrypted plaintext, and accompanied by explicit security warnings against storing secrets, API keys, or private tokens.
+3. **Safe DOM Rendering**: All dynamic outputs, syntax messages, diff highlights, and search queries are rendered using native text nodes and safe React elements. The use of `eval()`, `new Function()`, or `dangerouslySetInnerHTML` is strictly prohibited across the codebase to prevent Cross-Site Scripting (XSS).
+4. **Execution Isolation via Dedicated Web Workers**: Resource-intensive regular expression evaluation in Regex Playground runs inside an isolated dedicated Web Worker bounded by a strict 2,000ms execution timeout and input size guards (500,000-character test string, 2,500-character pattern, 1,000 matches maximum) to protect the main UI thread from browser lockups and catastrophic backtracking (ReDoS). If Web Worker creation fails or the worker encounters an unrecoverable error, execution halts safely with an explicit error message rather than falling back to synchronous execution on the main thread.
+5. **No Cryptographic Guarantees for Decoding or Encodings**:
+   - **JWT Inspector**: Decodes and displays header and payload structures purely client-side; it does **not** cryptographically verify signatures, secret keys, or token authenticity. Users are explicitly cautioned against relying on client-side decoding for authorization decisions.
+   - **Encode / Decode Lab**: Reversible data transformations (Base64, Base64URL, URL encoding, HTML entities, Hexadecimal UTF-8 bytes) represent data representations, **not** encryption or data protection mechanisms.
 
 ---
 

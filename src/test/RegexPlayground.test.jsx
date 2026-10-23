@@ -1,6 +1,6 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { RegexPlayground } from '../features/regex-playground/RegexPlayground';
 import { SAMPLE_REGEX } from '../lib/regexUtils';
 import { TOOLS } from '../lib/tools-registry';
@@ -259,5 +259,308 @@ describe('RegexPlayground Component', () => {
     expect(regexTool.status).toBe('active');
     expect(regexTool.statusLabel).toBe('Available Now');
     expect(regexTool.path).toBe('/regex-playground');
+  });
+
+  describe('Web Worker Execution Safety, Timeout & Stale Result Prevention', () => {
+    let originalWorker;
+
+    beforeEach(() => {
+      originalWorker = globalThis.Worker;
+    });
+
+    afterEach(() => {
+      globalThis.Worker = originalWorker;
+      vi.useRealTimers();
+    });
+
+    it('terminates worker and displays timeout error message on ReDoS timeout', () => {
+      vi.useFakeTimers();
+
+      let workerInstance;
+      class MockHangingWorker {
+        constructor() {
+          this.terminate = vi.fn();
+          this.postMessage = vi.fn(); // Never posts back message, simulating ReDoS
+          workerInstance = this;
+        }
+      }
+      globalThis.Worker = MockHangingWorker;
+
+      render(<RegexPlayground />);
+
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      fireEvent.change(patternInput, { target: { value: '(a+)+$' } });
+      fireEvent.change(testTextInput, { target: { value: 'aaaaaaaaaaaaaaaaaaaaa!' } });
+
+      // Fast-forward past DEFAULT_REGEX_TIMEOUT_MS (2000ms)
+      act(() => {
+        vi.advanceTimersByTime(2100);
+      });
+
+      expect(workerInstance.terminate).toHaveBeenCalled();
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(/Regex execution timed out/i);
+      expect(alert).toHaveTextContent(/catastrophic backtracking \(ReDoS\)/i);
+    });
+
+    it('ignores stale worker results when input changes before worker completes', () => {
+      const workerInstances = [];
+      class MockDelayedWorker {
+        constructor() {
+          this.terminate = vi.fn();
+          this.postMessage = vi.fn();
+          workerInstances.push(this);
+        }
+      }
+      globalThis.Worker = MockDelayedWorker;
+
+      render(<RegexPlayground />);
+
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      // First input change (dispatching request)
+      fireEvent.change(patternInput, { target: { value: 'first' } });
+      fireEvent.change(testTextInput, { target: { value: 'first and second' } });
+
+      const firstWorker = workerInstances[workerInstances.length - 1];
+
+      // Second input change immediately (updates pattern to 'second')
+      fireEvent.change(patternInput, { target: { value: 'second' } });
+
+      const secondWorker = workerInstances[workerInstances.length - 1];
+
+      // Simulate first worker responding late with stale result for request id 1
+      act(() => {
+        firstWorker.onmessage?.({
+          data: {
+            id: 1, // Stale request ID
+            success: true,
+            result: {
+              matches: [
+                {
+                  match: 'first',
+                  matchNumber: 1,
+                  index: 0,
+                  endIndex: 5,
+                  groups: [],
+                  namedGroups: null,
+                },
+              ],
+              error: null,
+              truncated: false,
+            },
+          },
+        });
+      });
+
+      // Second worker responds with current request id 2
+      act(() => {
+        secondWorker.onmessage?.({
+          data: {
+            id: 2,
+            success: true,
+            result: {
+              matches: [
+                {
+                  match: 'second',
+                  matchNumber: 1,
+                  index: 10,
+                  endIndex: 16,
+                  groups: [],
+                  namedGroups: null,
+                },
+              ],
+              error: null,
+              truncated: false,
+            },
+          },
+        });
+      });
+
+      expect(screen.getByText(/1 match found/i)).toBeInTheDocument();
+    });
+
+    it('terminates active worker when component unmounts', () => {
+      let workerInstance;
+      class MockWorker {
+        constructor() {
+          this.terminate = vi.fn();
+          this.postMessage = vi.fn();
+          workerInstance = this;
+        }
+      }
+      globalThis.Worker = MockWorker;
+
+      const { unmount } = render(<RegexPlayground />);
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      fireEvent.change(patternInput, { target: { value: 'abc' } });
+      fireEvent.change(testTextInput, { target: { value: 'abcdef' } });
+
+      unmount();
+
+      expect(workerInstance.terminate).toHaveBeenCalled();
+    });
+
+    it('displays error for pattern exceeding maximum size limit', () => {
+      render(<RegexPlayground />);
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      fireEvent.change(testTextInput, { target: { value: 'some test text' } });
+      fireEvent.change(patternInput, { target: { value: 'a'.repeat(5001) } });
+
+      expect(screen.getByRole('alert')).toBeInTheDocument();
+      expect(screen.getByText(/Pattern exceeds maximum allowed length/i)).toBeInTheDocument();
+    });
+
+    it('shows clear error and prevents synchronous fallback when worker creation fails', () => {
+      globalThis.Worker = undefined; // Simulate environment where workers are unavailable
+
+      render(<RegexPlayground />);
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      fireEvent.change(patternInput, { target: { value: 'test' } });
+      fireEvent.change(testTextInput, { target: { value: 'test input' } });
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(/Web Workers are unavailable or failed to initialize/i);
+      expect(alert).toHaveTextContent(
+        /cannot be safely evaluated without background worker isolation/i
+      );
+      expect(screen.queryByText(/1 match found/i)).not.toBeInTheDocument();
+    });
+
+    it('handles worker runtime error event gracefully without permanent loading state', () => {
+      let workerInstance;
+      class MockErrorWorker {
+        constructor() {
+          this.terminate = vi.fn();
+          this.postMessage = vi.fn();
+          workerInstance = this;
+        }
+      }
+      globalThis.Worker = MockErrorWorker;
+
+      render(<RegexPlayground />);
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      fireEvent.change(patternInput, { target: { value: 'abc' } });
+      fireEvent.change(testTextInput, { target: { value: 'abcdef' } });
+
+      act(() => {
+        workerInstance.onerror?.({ message: 'Script error inside worker.' });
+      });
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(/Script error inside worker/i);
+      expect(screen.queryByText(/Evaluating\.\.\./i)).not.toBeInTheDocument();
+    });
+
+    it('handles malformed worker message gracefully without throwing or locking UI', () => {
+      let workerInstance;
+      class MockMalformedWorker {
+        constructor() {
+          this.terminate = vi.fn();
+          this.postMessage = vi.fn();
+          workerInstance = this;
+        }
+      }
+      globalThis.Worker = MockMalformedWorker;
+
+      render(<RegexPlayground />);
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      fireEvent.change(patternInput, { target: { value: 'abc' } });
+      fireEvent.change(testTextInput, { target: { value: 'abcdef' } });
+
+      act(() => {
+        workerInstance.onmessage?.(null);
+      });
+
+      const alert = screen.getByRole('alert');
+      expect(alert).toHaveTextContent(/Worker returned a malformed response/i);
+      expect(screen.queryByText(/Evaluating\.\.\./i)).not.toBeInTheDocument();
+    });
+
+    it('recovers cleanly and resets error when user edits pattern after a worker failure', () => {
+      const workerInstances = [];
+      class MockFailThenSucceedWorker {
+        constructor() {
+          this.terminate = vi.fn();
+          this.postMessage = vi.fn();
+          workerInstances.push(this);
+        }
+      }
+      globalThis.Worker = MockFailThenSucceedWorker;
+
+      render(<RegexPlayground />);
+      const patternInput = screen.getByPlaceholderText(/e\.g\. \[A-Z0-9\._%\+-\]\+/i);
+      const testTextInput = screen.getByPlaceholderText(
+        /Paste or type test text to match against/i
+      );
+
+      // Step 1: trigger failing evaluation
+      fireEvent.change(patternInput, { target: { value: 'bad' } });
+      fireEvent.change(testTextInput, { target: { value: 'bad and good' } });
+
+      const firstWorker = workerInstances[workerInstances.length - 1];
+      act(() => {
+        firstWorker.onerror?.({ message: 'Initial worker failure.' });
+      });
+
+      expect(screen.getByRole('alert')).toHaveTextContent(/Initial worker failure/i);
+
+      // Step 2: edit pattern and simulate successful worker evaluation
+      fireEvent.change(patternInput, { target: { value: 'good' } });
+      const secondWorker = workerInstances[workerInstances.length - 1];
+
+      act(() => {
+        secondWorker.onmessage?.({
+          data: {
+            id: 2,
+            success: true,
+            result: {
+              matches: [
+                {
+                  match: 'good',
+                  matchNumber: 1,
+                  index: 8,
+                  endIndex: 12,
+                  groups: [],
+                  namedGroups: null,
+                },
+              ],
+              error: null,
+              truncated: false,
+            },
+          },
+        });
+      });
+
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByText(/1 match found/i)).toBeInTheDocument();
+    });
   });
 });
